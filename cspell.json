@@ -1,0 +1,27 @@
+{
+  "dictionaries": [
+    "python",
+    "en-gb"
+  ],
+  "ignorePaths": [
+    ".venv",
+    ".gitignore",
+    "pyproject.toml",
+    "*.svg",
+    "poetry.lock"
+  ],
+  "words": [
+    "cashin",
+    "linkingpublickey",
+    "lnmarkets",
+    "lnurl",
+    "nostr",
+    "ohlcs",
+    "pipreqs",
+    "stoploss",
+    "takeprofit",
+    "topt",
+    "Totp",
+    "webauthn"
+  ]
+}
