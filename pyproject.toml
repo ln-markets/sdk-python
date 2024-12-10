@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "ln-markets-sdk"
+packages = [
+  { include = "lnmarkets" }
+]
+version = "0.0.1"
+description = "LN Markets API v2 Python SDK"
+authors = [
+  "Flavian LEPRETTRE <flavian.leprettre@ito.am>"
+]
+readme = "README.md"
+license = "MIT"
+keywords = [
+  "lnmarkets",
+  "trading",
+  "rest",
+  "api",
+  "bitcoin",
+  "lightning",
+  "network",
+  "futures",
+  "options"
+]
+classifiers = [
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License", 
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
+urls = { "Homepage" = "https://github.com/ln-markets/sdk-python" }
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.32.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
