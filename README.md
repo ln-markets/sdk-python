@@ -12,6 +12,10 @@
   <a href="https://docs.lnmarkets.com/api/">
     API Reference
   </a>
+  -
+  <a href="https://github.com/ln-markets/sdk-ts">
+    TypeScript SDK
+  </a>
 </p>
 
 ## Installation
