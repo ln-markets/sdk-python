@@ -14,7 +14,7 @@ type Network = Literal['mainnet', 'testnet']
 type Method = Literal['GET', 'POST', 'PUT', 'DELETE']
 
 def _get_hostname(network: Network) -> str:
-  hostname = os.getenv('LNMARKETS_API_HOSTNAME')
+  hostname = os.getenv('LNM_API_HOSTNAME')
   
   if hostname:
     return hostname
