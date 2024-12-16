@@ -34,7 +34,7 @@ class _LNMOptions(TypedDict):
 
 class LNMClient():
   def __init__(self, options: _LNMOptions):
-    self.key = options.get('key', os.getenv('LNMARKETS_API_KEY'))
+    self.key = options.get('key', os.getenv('LNM_API_KEY'))
     self.secret = options.get('secret', os.getenv('LNM_API_SECRET'))
     self.passphrase = options.get('passphrase', os.getenv('LNM_API_PASSPHRASE'))
     self.network = options.get('network', os.getenv('LNM_API_NETWORK', 'mainnet'))
