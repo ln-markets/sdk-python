@@ -136,7 +136,7 @@ print(trades)
 1 - Clone the repository:
 
 ```bash
-git clone https://github.com/lnmarkets/python-sdk.git
+git clone https://github.com/ln-markets/sdk-python
 ```
 
 2 - Install the dependencies:
