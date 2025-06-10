@@ -34,7 +34,7 @@ urls = { "Homepage" = "https://github.com/ln-markets/sdk-python" }
 
 [tool.poetry.dependencies]
 python = "^3.11"
-requests = "^2.32.3"
+requests = "^2.32.4"
 python-dotenv = "^1.0.1"
 
 [build-system]
