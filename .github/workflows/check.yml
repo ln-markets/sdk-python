@@ -19,38 +19,20 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
-        id: setup-python
         with:
           python-version: 3.13
 
-      - uses: snok/install-poetry@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          version: 1.8.4
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          virtualenvs-path: .venv
-          installer-parallel: true
-
-      - uses: actions/cache@v3
-        id: cached-poetry-dependencies
-        name: Virtual env cache
-        with:
-          path: ./.venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          version: "latest"
+          enable-cache: true
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: uv sync --all-groups
 
-      - name: Install project
-        run: poetry install --no-interaction
+      - name: Run linter (ruff)
+        run: uv run ruff check .
 
-      - name: Run tests
-        run: |
-          source .venv/bin/activate
-          python -m unittest tests/test_rest.py
-        env:
-          LNM_API_KEY: ${{ secrets.LNM_API_KEY }}
-          LNM_API_SECRET: ${{ secrets.LNM_API_SECRET }}
-          LNM_API_PASSPHRASE: ${{ secrets.LNM_API_PASSPHRASE }}
-          LNM_API_NETWORK: testnet
+      - name: Run type checker (pyright)
+        run: uv run pyright

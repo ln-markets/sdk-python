@@ -1,148 +1,142 @@
-<p align="center">
-  <img src="./images/lnmarkets-logo.svg" alt="LN Markets" width="200" />
-</p>
+# LN Markets SDK v3
 
-<h1 align="center">LN Markets Python SDK</h1>
-
-<p align="center">
-  <a href="https://lnmarkets.com">
-    Website
-  </a>
-  -
-  <a href="https://docs.lnmarkets.com/api/">
-    API Reference
-  </a>
-  -
-  <a href="https://github.com/ln-markets/sdk-ts">
-    TypeScript SDK
-  </a>
-</p>
-
-## Installation
-
-Install the SDK using pip:
-
-```bash
-pip install lnmarkets-sdk
-```
-
-or using poetry:
-
-```bash
-poetry add lnmarkets-sdk
-```
+This is the Python version of the LN Markets API SDK. It provides a client-based interface for interacting with the LN Markets API.
 
 ## Usage
 
-The SDK is fully typed so you can use it with your IDE's autocompletion and should be fairly easy to use.
-
-Here is an example of the most simple usage of the SDK.
+For public endpoints, you can just do this:
 
 ```python
-from datetime import datetime
-from lnmarkets import LNMClient
+from lnmarkets_sdk.client import LNMClient
+import asyncio
 
-# Import a topic module entirely
-from lnmarkets import user
-# or a specific function
-from lnmarkets.futures import get_trades
-
-# Initialize the client
-client = LNMClient(options={
-  'network': 'testnet', # 'mainnet' by default, or LNM_API_NETWORK environment variable
-  'key': 'api key', # LNMARKETS_API_KEY environment variable by default
-  'secret': 'api secret', # LNM_API_SECRET environment variable by default
-  'passphrase': 'passphrase', # LNM_API_PASSPHRASE environment variable by default
-})
-
-# Use the imported module
-user_info = user.get_user(client)
-
-print(user_info['uid'])
-print(user_info['username'])
-
-# Use a specific function
-trades = get_trades(client, {
-  'type': 'open',
-  'from_ts': int(datetime.now().timestamp() - 1_000_000),
-  'to': int(datetime.now().timestamp()),
-  'limit': 100,
-})
-
-print(trades)
+async with LNMClient() as client:
+  ticker = await client.futures.get_ticker()
+  await asyncio.sleep(1)
+  leaderboard = await client.futures.get_leaderboard()
 ```
 
-## Function List
+Remember to sleep between requests, as the rate limit is 1 requests per second for public endpoints.
 
-| Function | Method | Route | Documentation |
-| --- | --- | --- | --- |
-| futures.add_margin | POST | /futures/add-margin | [Reference](https://docs.lnmarkets.com/api/operations/futuresaddmargin) |
-| futures.cancel_all_trades | DELETE | /futures/all/cancel | [Reference](https://docs.lnmarkets.com/api/operations/futurescancelalltrades) |
-| futures.cancel_trade | POST | /futures/cancel | [Reference](https://docs.lnmarkets.com/api/operations/futurescanceltrade) |
-| futures.cash_in | POST | /futures/cash-in | [Reference](https://docs.lnmarkets.com/api/operations/futurescashin) |
-| futures.close_all_trades | DELETE | /futures/all/close | [Reference](https://docs.lnmarkets.com/api/operations/futuresclosealltrades) |
-| futures.close_trade | DELETE | /futures | [Reference](https://docs.lnmarkets.com/api/operations/futuresclosetrade) |
-| futures.get_carry_fees_history | GET | /futures/carry-fees | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetcarryfees) |
-| futures.get_fixing_history | GET | /futures/history/fixing | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetfixinghistory) |
-| futures.get_index_history | GET | /futures/history/index | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetindexhistory) |
-| futures.get_leaderboard | GET | /futures/leaderboard | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetleaderboard) |
-| futures.get_market_details | GET | /futures/market | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetmarketdetails) |
-| futures.get_ohlc_history | GET | /futures/ohlcs | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetohlcs) |
-| futures.get_price_history | GET | /futures/history/price | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetpricehistory) |
-| futures.get_ticker | GET | /futures/ticker | [Reference](https://docs.lnmarkets.com/api/operations/futuresgetticker) |
-| futures.get_trade | GET | /futures/trades/:id | [Reference](https://docs.lnmarkets.com/api/operations/futuresgettrade) |
-| futures.get_trades | GET | /futures | [Reference](https://docs.lnmarkets.com/api/operations/futuresgettrades) |
-| futures.new_trade | POST | /futures | [Reference](https://docs.lnmarkets.com/api/operations/futuresnewtrade) |
-| futures.update_trade | PUT | /futures | [Reference](https://docs.lnmarkets.com/api/operations/futuresupdatetrade) |
-| notifications.get_all_notifications | GET | /notifications | [Reference](https://docs.lnmarkets.com/api/operations/notificationsfetchnotifications) |
-| notifications.mark_all_as_read | DELETE | /notifications/all | [Reference](https://docs.lnmarkets.com/api/operations/notificationsmarkallnotificationsasread) |
-| options.close_all_trades | DELETE | /options/all/close | [Reference](https://docs.lnmarkets.com/api/operations/optionsclosealltrades) |
-| options.close_trade | DELETE | /options | [Reference](https://docs.lnmarkets.com/api/operations/optionsclosetrade) |
-| options.get_instrument | GET | /options/instrument | [Reference](https://docs.lnmarkets.com/api/operations/optionsgetinstrument) |
-| options.get_instruments | GET | /options/instruments | [Reference](https://docs.lnmarkets.com/api/operations/optionsgetinstruments) |
-| options.get_market_details | GET | /options | [Reference](https://docs.lnmarkets.com/api/operations/optionsgetoptionsmarket) |
-| options.get_trade | GET | /options/trades/:id | [Reference](https://docs.lnmarkets.com/api/operations/optionsgettrade) |
-| options.get_trades | GET | /options/trades | [Reference](https://docs.lnmarkets.com/api/operations/optionsgettrades) |
-| options.new_trade | POST | /options | [Reference](https://docs.lnmarkets.com/api/operations/optionsnewtrade) |
-| options.update_trade | PUT | /options | [Reference](https://docs.lnmarkets.com/api/operations/optionsupdatetrade) |
-| oracle.get_last_price | GET | /oracle/last-price | [Reference](https://docs.lnmarkets.com/api/operations/oraclegetlastprice) |
-| swaps.get_swap_by_source_id | GET | /swap/source/:sourceId | [Reference](https://docs.lnmarkets.com/api/operations/swapsgetswapbysourceid) |
-| swaps.get_swap | GET | /swap/:swapId | [Reference](https://docs.lnmarkets.com/api/operations/swapsgetswap) |
-| swaps.get_swaps | GET | /swap | [Reference](https://docs.lnmarkets.com/api/operations/swapsgetswaps) |
-| swaps.new_swap | POST | /swap | [Reference](https://docs.lnmarkets.com/api/operations/swapsnewswap) |
-| user.deposit_synthetic_usd | POST | /user/deposit/susd | [Reference](https://docs.lnmarkets.com/api/operations/userdepositsyntheticusd) |
-| user.deposit | POST | /user/deposit | [Reference](https://docs.lnmarkets.com/api/operations/userdeposit) |
-| user.get_bitcoin_addresses | GET | /user/bitcoin/addresses | [Reference](https://docs.lnmarkets.com/api/operations/usergetbitcoinaddresses) |
-| user.get_deposit | GET | /user/deposit/:depositId | [Reference](https://docs.lnmarkets.com/api/operations/usergetdeposit) |
-| user.get_deposits | GET | /user/deposit | [Reference](https://docs.lnmarkets.com/api/operations/usergetdeposits) |
-| user.get_user | GET | /user | [Reference](https://docs.lnmarkets.com/api/operations/usergetuser) |
-| user.get_withdrawal | GET | /user/withdrawals/:id | [Reference](https://docs.lnmarkets.com/api/operations/usergetwithdrawal) |
-| user.get_withdrawals | GET | /user/withdraw | [Reference](https://docs.lnmarkets.com/api/operations/usergetwithdrawals) |
-| user.new_bitcoin_address | POST | /user/bitcoin/address | [Reference](https://docs.lnmarkets.com/api/operations/usernewbitcoinaddress) |
-| user.transfer | POST | /user/transfer | [Reference](https://docs.lnmarkets.com/api/operations/usertransfer) |
-| user.update_user | PUT | /user | [Reference](https://docs.lnmarkets.com/api/operations/userupdate) |
-| user.withdraw_synthetic_usd | POST | /user/withdraw/susd | [Reference](https://docs.lnmarkets.com/api/operations/userwithdrawalsyntheticusd) |
-| user.withdraw | POST | /user/withdraw | [Reference](https://docs.lnmarkets.com/api/operations/userwithdraw) |
+For endpoints that need authentication, you need to create an instance of the `LNMClient` class and provide your API credentials:
 
-## Development
+```python
+from lnmarkets_sdk.client import APIAuthContext, APIClientConfig, LNMClient
 
-### Prerequisites
+config = APIClientConfig(
+    authentication=APIAuthContext(
+        key=your_key,
+        secret=your_secret,
+        passphrase=your_passphrase,
+    ),
+    network="mainnet",
+    timeout=60.0,  # 60 second timeout (default is 30s)
+    )
 
-- Python 3.11 or higher
-- Poetry
-
-### Steps
-
-1 - Clone the repository:
-
-```bash
-git clone https://github.com/ln-markets/sdk-python
+async with LNMClient(config) as client:
+  account = await client.account.get_account()
 ```
 
-2 - Install the dependencies:
+For endpoints that requires input parameters, you can find the corresponding models in the `lnmarkets_sdk.models` module.
 
-```bash
-poetry install
+```python
+
+from lnmarkets_sdk.client import APIAuthContext, APIClientConfig, LNMClient
+from lnmarkets_sdk.models.account import GetLightningDepositsParams
+
+config = APIClientConfig(
+    authentication=APIAuthContext(
+        key=your_key,
+        secret=your_secret,
+        passphrase=your_passphrase,
+    ),
+    network="mainnet",
+    timeout=60.0,  # 60 second timeout (default is 30s)
+    )
+
+async with LNMClient(config) as client:
+    deposits = await client.account.get_lightning_deposits(
+        GetLightningDepositsParams(limit=5)
+    )
 ```
 
-3 - Have fun!
+Check our [example](./examples/basic.py) for more details.
+
+## Available Methods
+
+🔒 = requires API credentials
+
+```python
+# Ping
+client.ping()
+
+# Account 🔒
+client.account.get_account()
+client.account.get_bitcoin_address()
+client.account.add_bitcoin_address()
+client.account.deposit_lightning()
+client.account.withdraw_lightning()
+client.account.withdraw_internal()
+client.account.withdraw_on_chain()
+client.account.get_lightning_deposits()
+client.account.get_lightning_withdrawals()
+client.account.get_internal_deposits()
+client.account.get_internal_withdrawals()
+client.account.get_on_chain_deposits()
+client.account.get_on_chain_withdrawals()
+
+# Futures
+client.futures.get_ticker()
+client.futures.get_leaderboard()
+client.futures.get_candles()
+client.futures.get_funding_settlements()
+
+# Futures Isolated 🔒
+client.futures.isolated.new_trade()
+client.futures.isolated.get_running_trades()
+client.futures.isolated.get_open_trades()
+client.futures.isolated.get_closed_trades()
+client.futures.isolated.close()
+client.futures.isolated.cancel()
+client.futures.isolated.cancel_all()
+client.futures.isolated.add_margin()
+client.futures.isolated.cash_in()
+client.futures.isolated.update_stoploss()
+client.futures.isolated.update_takeprofit()
+client.futures.isolated.get_funding_fees()
+
+# Futures Cross 🔒
+client.futures.cross.new_order()
+client.futures.cross.get_position()
+client.futures.cross.get_open_orders()
+client.futures.cross.get_filled_orders()
+client.futures.cross.close()
+client.futures.cross.cancel()
+client.futures.cross.cancel_all()
+client.futures.cross.deposit()
+client.futures.cross.withdraw()
+client.futures.cross.set_leverage()
+client.futures.cross.get_transfers()
+client.futures.cross.get_funding_fees()
+
+# Oracle
+client.oracle.get_index()
+client.oracle.get_last_price()
+
+# Synthetic USD
+client.synthetic_usd.get_best_price()
+client.synthetic_usd.get_swaps()  # 🔒
+client.synthetic_usd.new_swap()   # 🔒
+```
+
+## API Reference
+
+For full API documentation, see: [LNM API Documentation](https://docs.lnmarkets.com/)
+
+## Contributing
+
+Contributions are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
