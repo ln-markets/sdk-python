@@ -22,8 +22,12 @@ class FuturesOrder(BaseModel, BaseConfig):
         multiple_of=0.5,
         description="Take profit price level (0 if not set)",
     )
-    margin: int | None = Field(None, description="Margin of the position (in satoshis)")
-    quantity: int | None = Field(None, description="Quantity of the position (in USD)")
+    margin: int | None = Field(
+        default=None, description="Margin of the position (in satoshis)"
+    )
+    quantity: int | None = Field(
+        default=None, description="Quantity of the position (in USD)"
+    )
     price: float | None = Field(
         default=None, gt=0, multiple_of=0.5, description="Price of the limit order"
     )

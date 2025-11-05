@@ -27,10 +27,10 @@ class PriceBucket(BaseModel, BaseConfig):
     """Price bucket for ticker."""
 
     ask_price: float | None = Field(
-        None, description="Current best ask/sell price available (in USD)"
+        default=None, description="Current best ask/sell price available (in USD)"
     )
     bid_price: float | None = Field(
-        None, description="Current best bid price available (in USD)"
+        default=None, description="Current best bid price available (in USD)"
     )
     max_size: int = Field(..., description="Maximum order size (in BTC)")
     min_size: int = Field(..., description="Minimum order size (in BTC)")
@@ -78,7 +78,9 @@ class UserInfo(BaseModel, BaseConfig):
 class Leaderboard(BaseModel, BaseConfig):
     """Futures leaderboard data."""
 
-    all_time: list[UserInfo] = Field(alias="all-time")
+    all_time: list[UserInfo] = Field(
+        validation_alias="all-time", serialization_alias="all-time"
+    )
     daily: list[UserInfo]
     monthly: list[UserInfo]
     weekly: list[UserInfo]
@@ -86,7 +88,10 @@ class Leaderboard(BaseModel, BaseConfig):
 
 class GetCandlesParams(BaseModel, BaseConfig):
     from_: str = Field(
-        ..., alias="from", description="Start date as a string value in ISO format"
+        ...,
+        validation_alias="from",
+        serialization_alias="from",
+        description="Start date as a string value in ISO format",
     )
     range: CandleResolution = Field(
         default="1m", description="Resolution of the OHLC candle"
@@ -94,7 +99,9 @@ class GetCandlesParams(BaseModel, BaseConfig):
     limit: int = Field(
         default=100, ge=1, le=1000, description="Number of entries to return"
     )
-    to: str | None = Field(None, description="End date as a string value in ISO format")
+    to: str | None = Field(
+        default=None, description="End date as a string value in ISO format"
+    )
 
 
 class GetFundingSettlementsParams(FromToLimitParams): ...

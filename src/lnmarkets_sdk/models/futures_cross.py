@@ -71,12 +71,12 @@ class FuturesCrossCanceledOrder(BaseModel, BaseConfig):
 
 class FuturesCrossPosition(BaseModel, BaseConfig):
     delta_pl: float = Field(..., description="Delta P&L")
-    entry_price: float | None = Field(None, description="Entry price")
+    entry_price: float | None = Field(default=None, description="Entry price")
     funding_fees: float = Field(..., description="Funding fees")
     id: UUID = Field(..., description="Position ID")
     initial_margin: float = Field(..., description="Initial margin")
     leverage: int = Field(..., gt=0, description="Leverage")
-    liquidation: float | None = Field(None, description="Liquidation price")
+    liquidation: float | None = Field(default=None, description="Liquidation price")
     maintenance_margin: float = Field(..., description="Maintenance margin")
     margin: float = Field(..., description="Current margin")
     quantity: float = Field(..., description="Position quantity")

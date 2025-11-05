@@ -8,7 +8,7 @@ from pprint import pprint
 
 from dotenv import load_dotenv
 
-from lnmarkets_sdk.client import APIAuthContext, APIClientConfig, LNMClient
+from lnmarkets_sdk.http.client import APIAuthContext, APIClientConfig, LNMClient
 from lnmarkets_sdk.models.account import GetLightningDepositsParams
 from lnmarkets_sdk.models.futures_cross import (
     FuturesCrossOrderLimit,
@@ -25,7 +25,7 @@ async def example_public_endpoints():
 
     # Create client without authentication for public endpoints
     # The httpx.AsyncClient is created once and reuses connections
-    async with LNMClient() as client:
+    async with LNMClient(APIClientConfig(network="testnet4")) as client:
         # All these requests share the same connection pool
         print("\n🔄 Making multiple requests with connection reuse...")
 
@@ -65,15 +65,16 @@ async def example_authenticated_endpoints():
     print("AUTHENTICATED ENDPOINTS EXAMPLE")
     print("=" * 80)
 
-    key = os.getenv("LNM_API_KEY_V3")
-    secret = os.getenv("LNM_API_SECRET_V3")
-    passphrase = os.getenv("LNM_API_PASSPHRASE_V3")
+    key = os.getenv("V3_API_KEY")
+    secret = os.getenv("V3_API_KEY_SECRET")
+    passphrase = os.getenv("V3_API_KEY_PASSPHRASE")
+    print(f"key: {key}")
+    print(f"secret: {secret}")
+    print(f"passphrase: {passphrase}")
 
     if not (key and secret and passphrase):
         print("\n⚠️  Skipping authenticated example:")
-        print(
-            "    Please set LNM_API_KEY_V3, LNM_API_SECRET_V3, and LNM_API_PASSPHRASE_V3"
-        )
+        print("    Please set V3_API_KEY, V3_API_KEY_SECRET, and V3_API_KEY_PASSPHRASE")
         return
 
     # Create config with authentication and custom timeout
@@ -83,7 +84,7 @@ async def example_authenticated_endpoints():
             secret=secret,
             passphrase=passphrase,
         ),
-        network="mainnet",
+        network="testnet4",
         timeout=60.0,  # 60 second timeout (default is 30s)
     )
 
@@ -104,7 +105,7 @@ async def example_authenticated_endpoints():
 
         # Get lightning deposits (last 5)
         deposits = await client.account.get_lightning_deposits(
-            GetLightningDepositsParams(limit=5)
+            GetLightningDepositsParams(from_="2022-01-01", limit=5)
         )
         print(f"\n--- Recent Lightning Deposits (Last {len(deposits)}) ---")
         for deposit in deposits:

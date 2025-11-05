@@ -12,15 +12,17 @@ class Account(BaseModel, BaseConfig):
     )
     balance: float = Field(..., description="Balance of the user (in satoshis)")
     fee_tier: int = Field(..., description="Fee tier of the user")
-    email: str | None = Field(None, description="Email of the user")
+    email: str | None = Field(default=None, description="Email of the user")
     id: UUID = Field(..., description="Unique identifier for this account")
-    linking_public_key: str | None = Field(None, description="Public key of the user")
+    linking_public_key: str | None = Field(
+        default=None, description="Public key of the user"
+    )
 
 
 class BitcoinDepositCondensed(BaseModel, BaseConfig):
     amount: float = Field(..., description="The amount of the deposit")
     block_height: int | None = Field(
-        None, description="The block height of the deposit"
+        default=None, description="The block height of the deposit"
     )
     confirmations: int = Field(
         ..., description="The number of confirmations of the deposit"
@@ -51,12 +53,14 @@ class LightningDepositCondensed(BaseModel, BaseConfig):
     amount: float | None = Field(
         None, description="Amount of the deposit (in satoshis)"
     )
-    comment: str | None = Field(None, description="Comment of the deposit")
+    comment: str | None = Field(default=None, description="Comment of the deposit")
     created_at: str = Field(..., description="Timestamp when the deposit was created")
     id: UUID = Field(..., description="Unique identifier for this deposit")
-    payment_hash: str | None = Field(None, description="Payment hash of the deposit")
+    payment_hash: str | None = Field(
+        default=None, description="Payment hash of the deposit"
+    )
     settled_at: str | None = Field(
-        None, description="Timestamp when the deposit was settled"
+        default=None, description="Timestamp when the deposit was settled"
     )
 
 
@@ -79,12 +83,16 @@ class OnChainWithdrawalCondensed(BaseModel, BaseConfig):
     created_at: str = Field(
         ..., description="Timestamp when the withdrawal was created"
     )
-    fee: float | None = Field(None, description="Fee of the withdrawal (in satoshis)")
+    fee: float | None = Field(
+        default=None, description="Fee of the withdrawal (in satoshis)"
+    )
     id: UUID = Field(..., description="Unique identifier for the withdrawal")
     status: Literal["canceled", "pending", "processed", "processing", "rejected"] = (
         Field(..., description="Status of the withdrawal")
     )
-    tx_id: str | None = Field(None, description="Transaction ID of the withdrawal")
+    tx_id: str | None = Field(
+        default=None, description="Transaction ID of the withdrawal"
+    )
 
 
 class InternalTransfer(BaseModel, BaseConfig):
@@ -154,7 +162,7 @@ class AddBitcoinAddressParams(BaseModel, BaseConfig):
 
 class DepositLightningParams(BaseModel, BaseConfig):
     amount: int = Field(..., gt=0, description="Amount to deposit (in satoshis)")
-    comment: str | None = Field(None, description="Comment for the deposit")
+    comment: str | None = Field(default=None, description="Comment for the deposit")
     description_hash: str | None = Field(
         default=None,
         pattern=r"^[a-f0-9]{64}$",

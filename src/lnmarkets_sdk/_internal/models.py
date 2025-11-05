@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic.alias_generators import to_camel
 from pydantic.types import UUID4
 
-type APINetwork = Literal["mainnet", "testnet"]
+type APINetwork = Literal["mainnet", "testnet4"]
 type APIMethod = Literal["GET", "POST", "PUT"]
 type UUID = UUID4
 
@@ -19,7 +19,7 @@ class BaseConfig:
         str_strip_whitespace=True,
         use_enum_values=True,
         alias_generator=to_camel,
-        populate_by_name=True,  # to make `from_` field becomes `from`
+        validate_by_name=True,  # to make `from_` field becomes `from`
     )
 
 
@@ -79,7 +79,8 @@ class APIHTTPException(APIException):
 class FromToLimitParams(BaseModel, BaseConfig):
     from_: str | None = Field(
         default=None,
-        alias="from",
+        serialization_alias="from",
+        validation_alias="from",
         description="Start date as a string value in ISO format",
     )
     limit: int = Field(

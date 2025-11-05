@@ -3,7 +3,6 @@
 import hashlib
 import hmac
 import json
-import os
 from base64 import b64encode
 from collections.abc import Mapping
 from datetime import datetime
@@ -71,10 +70,9 @@ def create_auth_headers(
 
 def get_hostname(network: APINetwork) -> str:
     """Get API hostname based on network."""
-    hostname = os.getenv("LNM_API_HOSTNAME")
-    if hostname:
-        return hostname
-    return "api.testnet.lnmarkets.com" if network == "testnet" else "api.lnmarkets.com"
+    return (
+        "api.testnet4.lnmarkets.com" if network == "testnet4" else "api.lnmarkets.com"
+    )
 
 
 def parse_response[T](

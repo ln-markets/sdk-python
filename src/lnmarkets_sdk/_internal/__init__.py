@@ -52,32 +52,30 @@ class BaseClient:
         if not self._client:
             raise RuntimeError("Client must be used within async context manager")
 
-        data = prepare_params(params)
+        params_dict = prepare_params(params)
         headers = {}
 
         if credentials:
             if not self.auth:
                 raise ValueError("Authentication required but no credentials provided")
 
-            body_str = ""
-            if data:
+            data = ""
+            if params_dict:
                 if method == "GET":
-                    path = f"{path}?{urlencode({k: str(v) for k, v in data.items()})}"
+                    data = f"?{urlencode({k: str(v) for k, v in params_dict.items()})}"
                 else:
-                    body_str = json.dumps(data, separators=(",", ":"))
+                    data = json.dumps(params_dict, separators=(",", ":"))
                     headers.update({"Content-Type": "application/json"})
 
-            auth_headers = create_auth_headers(
-                self.auth, method, f"/v3{path}", body_str
-            )
+            auth_headers = create_auth_headers(self.auth, method, f"/v3{path}", data)
             headers.update(auth_headers)
 
         # Use httpx native parameter handling
         if method == "GET":
             return await self._client.request(
-                method, path, params=data, headers=headers if headers else None
+                method, path, params=params_dict, headers=headers if headers else None
             )
         else:
             return await self._client.request(
-                method, path, json=data, headers=headers if headers else None
+                method, path, json=params_dict, headers=headers if headers else None
             )

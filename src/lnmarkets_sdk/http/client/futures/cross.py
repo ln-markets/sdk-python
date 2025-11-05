@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lnmarkets_sdk.client import LNMClient
+    from lnmarkets_sdk.http.client import LNMClient
 
 from lnmarkets_sdk.models.funding_fees import FundingFees
 from lnmarkets_sdk.models.futures_cross import (

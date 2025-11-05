@@ -9,7 +9,7 @@ class FundingFees(BaseModel, BaseConfig):
     fee: float = Field(..., description="Funding fee amount")
     settlement_id: UUID = Field(..., description="Funding settlement ID")
     time: str = Field(..., description="Timestamp in ISO format")
-    trade_id: UUID | None = Field(None, description="Associated trade ID")
+    trade_id: UUID | None = Field(default=None, description="Associated trade ID")
 
 
 class FundingSettlement(BaseModel, BaseConfig):
