@@ -1,13 +1,4 @@
-"""Integration tests for LNMarkets SDK v3 - tests against real API.
-
-WARNING: These tests make real API calls to testnet4.lnmarkets.com
-- They may be rate limited if run too frequently
-- Authenticated tests require valid API credentials
-- Some tests create and cancel orders on the real exchange
-
-Run with: pytest tests/test_integration_v3.py -v -s
-Run authenticated tests: V3_API_KEY=... pytest tests/test_integration_v3.py -v
-"""
+"""Integration tests for LNMarkets SDK v3"""
 
 import asyncio
 import os
@@ -52,14 +43,12 @@ class TestBasicsIntegration:
 
     @pytest.mark.asyncio
     async def test_ping(self):
-        """Test ping endpoint against real API."""
         async with LNMClient(create_public_config()) as client:
             result = await client.ping()
             assert "pong" in result
 
     @pytest.mark.asyncio
     async def test_time(self):
-        """Test time endpoint against real API."""
         async with LNMClient(create_public_config()) as client:
             result = await client.request("GET", "/time")
             assert "time" in result
@@ -75,7 +64,6 @@ class TestAccountIntegration:
     )
     @pytest.mark.asyncio
     async def test_get_account(self):
-        """Test getting account info from real API."""
         async with LNMClient(create_auth_config()) as client:
             account = await client.account.get_account()
             assert account.balance >= 0
@@ -90,7 +78,6 @@ class TestAccountIntegration:
     )
     @pytest.mark.asyncio
     async def test_deposit_lightning(self):
-        """Test creating a lightning deposit invoice on real API."""
         async with LNMClient(create_auth_config()) as client:
             params = DepositLightningParams(amount=100_000)
             result = await client.account.deposit_lightning(params)
@@ -103,7 +90,6 @@ class TestFuturesIntegration:
 
     @pytest.mark.asyncio
     async def test_get_ticker(self):
-        """Test getting futures ticker from real API."""
         async with LNMClient(create_public_config()) as client:
             ticker = await client.futures.get_ticker()
             assert ticker.index > 0
@@ -111,14 +97,12 @@ class TestFuturesIntegration:
 
     @pytest.mark.asyncio
     async def test_get_leaderboard(self):
-        """Test getting leaderboard from real API."""
         async with LNMClient(create_public_config()) as client:
             leaderboard = await client.futures.get_leaderboard()
             assert isinstance(leaderboard.daily, list)
 
     @pytest.mark.asyncio
     async def test_get_candles(self):
-        """Test getting candles from real API."""
         from lnmarkets_sdk.models.futures_data import GetCandlesParams
 
         async with LNMClient(create_public_config()) as client:
@@ -139,7 +123,6 @@ class TestFuturesIntegration:
     )
     @pytest.mark.asyncio
     async def test_futures_isolated(self):
-        """Test complete futures isolated workflow on real API."""
         async with LNMClient(create_auth_config()) as client:
             # Create a new trade
             params = FuturesOrder(
@@ -180,7 +163,6 @@ class TestFuturesCrossIntegration:
     )
     @pytest.mark.asyncio
     async def test_get_position(self):
-        """Test getting cross margin position from real API."""
         async with LNMClient(create_auth_config()) as client:
             position = await client.futures.cross.get_position()
             assert position.margin >= 0
@@ -192,7 +174,6 @@ class TestFuturesCrossIntegration:
     )
     @pytest.mark.asyncio
     async def test_cross_orders(self):
-        """Test getting cross margin orders from real API."""
         async with LNMClient(create_auth_config()) as client:
             # Get open orders
             open_orders = await client.futures.cross.get_open_orders()
@@ -211,7 +192,6 @@ class TestOracleIntegration:
 
     @pytest.mark.asyncio
     async def test_get_last_price(self):
-        """Test getting last price from real API."""
         async with LNMClient(create_public_config()) as client:
             result = await client.oracle.get_last_price()
             assert result[0].last_price > 0
@@ -219,7 +199,6 @@ class TestOracleIntegration:
 
     @pytest.mark.asyncio
     async def test_get_index(self):
-        """Test getting index history from real API."""
         from lnmarkets_sdk.models.oracle import GetIndexParams
 
         async with LNMClient(create_public_config()) as client:
@@ -235,7 +214,6 @@ class TestSyntheticUSDIntegration:
 
     @pytest.mark.asyncio
     async def test_get_best_price(self):
-        """Test getting best price from real API."""
         async with LNMClient(create_public_config()) as client:
             result = await client.synthetic_usd.get_best_price()
             assert result.ask_price
@@ -246,7 +224,6 @@ class TestSyntheticUSDIntegration:
     )
     @pytest.mark.asyncio
     async def test_get_swaps(self):
-        """Test getting swaps from real API."""
         from lnmarkets_sdk.models.synthetic_usd import GetSwapsParams
 
         async with LNMClient(create_auth_config()) as client:
