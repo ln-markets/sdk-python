@@ -6,22 +6,22 @@ if TYPE_CHECKING:
 from lnmarkets_sdk.models.account import (
     Account,
     AddBitcoinAddressParams,
-    BitcoinAddressResponse,
-    BitcoinAddressWithTimestampResponse,
-    BitcoinDepositCondensed,
+    AddBitcoinAddressResponse,
     DepositLightningParams,
     DepositLightningResponse,
+    GetBitcoinAddressResponse,
     GetInternalDepositsParams,
+    GetInternalDepositsResponse,
     GetInternalWithdrawalsParams,
+    GetInternalWithdrawalsResponse,
     GetLightningDepositsParams,
+    GetLightningDepositsResponse,
     GetLightningWithdrawalsParams,
+    GetLightningWithdrawalsResponse,
     GetOnChainDepositsParams,
+    GetOnChainDepositsResponse,
     GetOnChainWithdrawalsParams,
-    InternalDepositCondensed,
-    InternalWithdrawalCondensed,
-    LightningDepositCondensed,
-    LightningWithdrawalCondensed,
-    OnChainWithdrawalCondensed,
+    GetOnChainWithdrawalsResponse,
     WithdrawInternalParams,
     WithdrawInternalResponse,
     WithdrawLightningParams,
@@ -52,7 +52,7 @@ class AccountClient:
             "GET",
             "/account/address/bitcoin",
             credentials=True,
-            response_model=BitcoinAddressResponse,
+            response_model=GetBitcoinAddressResponse,
         )
 
     async def add_bitcoin_address(self, params: AddBitcoinAddressParams | None = None):
@@ -62,7 +62,7 @@ class AccountClient:
             "/account/address/bitcoin",
             params=params,
             credentials=True,
-            response_model=BitcoinAddressWithTimestampResponse,
+            response_model=AddBitcoinAddressResponse,
         )
 
     async def deposit_lightning(self, params: DepositLightningParams):
@@ -114,7 +114,7 @@ class AccountClient:
             "/account/deposits/lightning",
             params=params,
             credentials=True,
-            response_model=list[LightningDepositCondensed],
+            response_model=list[GetLightningDepositsResponse],
         )
 
     async def get_lightning_withdrawals(
@@ -126,7 +126,7 @@ class AccountClient:
             "/account/withdrawals/lightning",
             params=params,
             credentials=True,
-            response_model=list[LightningWithdrawalCondensed],
+            response_model=list[GetLightningWithdrawalsResponse],
         )
 
     async def get_internal_deposits(
@@ -138,7 +138,7 @@ class AccountClient:
             "/account/deposits/internal",
             params=params,
             credentials=True,
-            response_model=list[InternalDepositCondensed],
+            response_model=list[GetInternalDepositsResponse],
         )
 
     async def get_internal_withdrawals(
@@ -150,7 +150,7 @@ class AccountClient:
             "/account/withdrawals/internal",
             params=params,
             credentials=True,
-            response_model=list[InternalWithdrawalCondensed],
+            response_model=list[GetInternalWithdrawalsResponse],
         )
 
     async def get_on_chain_deposits(
@@ -162,7 +162,7 @@ class AccountClient:
             "/account/deposits/bitcoin",
             params=params,
             credentials=True,
-            response_model=list[BitcoinDepositCondensed],
+            response_model=list[GetOnChainDepositsResponse],
         )
 
     async def get_on_chain_withdrawals(
@@ -174,5 +174,5 @@ class AccountClient:
             "/account/withdrawals/bitcoin",
             params=params,
             credentials=True,
-            response_model=list[OnChainWithdrawalCondensed],
+            response_model=list[GetOnChainWithdrawalsResponse],
         )

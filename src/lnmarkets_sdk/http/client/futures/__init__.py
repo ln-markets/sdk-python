@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lnmarkets_sdk.http.client import LNMClient
 
-from lnmarkets_sdk.models.funding_fees import FundingSettlementResponse
+from lnmarkets_sdk.models.funding_fees import GetFundingSettlementsResponse
 from lnmarkets_sdk.models.futures_data import (
     Candle,
     GetCandlesParams,
@@ -61,5 +61,5 @@ class FuturesClient:
             "/futures/funding-settlements",
             params=params,
             credentials=False,
-            response_model=FundingSettlementResponse,
+            response_model=GetFundingSettlementsResponse,
         )

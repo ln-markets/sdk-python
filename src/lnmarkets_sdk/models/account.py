@@ -19,7 +19,7 @@ class Account(BaseModel, BaseConfig):
     )
 
 
-class BitcoinDepositCondensed(BaseModel, BaseConfig):
+class GetOnChainDepositsResponse(BaseModel, BaseConfig):
     amount: float = Field(..., description="The amount of the deposit")
     block_height: int | None = Field(
         default=None, description="The block height of the deposit"
@@ -35,21 +35,21 @@ class BitcoinDepositCondensed(BaseModel, BaseConfig):
     tx_id: str = Field(..., description="The transaction ID of the deposit")
 
 
-class InternalDepositCondensed(BaseModel, BaseConfig):
+class GetInternalDepositsResponse(BaseModel, BaseConfig):
     amount: float = Field(..., description="Amount of the deposit (in satoshis)")
     created_at: str = Field(..., description="Timestamp when the deposit was created")
     from_username: str = Field(..., description="Username of the sender")
     id: UUID = Field(..., description="Unique identifier for this deposit")
 
 
-class InternalWithdrawalCondensed(BaseModel, BaseConfig):
+class GetInternalWithdrawalsResponse(BaseModel, BaseConfig):
     amount: float = Field(..., description="Amount of the transfer (in satoshis)")
     created_at: str = Field(..., description="Timestamp when the transfer was created")
     id: UUID = Field(..., description="Unique identifier for this transfer")
     to_username: str = Field(..., description="Username of the recipient")
 
 
-class LightningDepositCondensed(BaseModel, BaseConfig):
+class GetLightningDepositsResponse(BaseModel, BaseConfig):
     amount: float | None = Field(
         None, description="Amount of the deposit (in satoshis)"
     )
@@ -64,7 +64,7 @@ class LightningDepositCondensed(BaseModel, BaseConfig):
     )
 
 
-class LightningWithdrawalCondensed(BaseModel, BaseConfig):
+class GetLightningWithdrawalsResponse(BaseModel, BaseConfig):
     amount: float = Field(..., description="Amount of the withdrawal (in satoshis)")
     created_at: str = Field(
         ..., description="Timestamp when the withdrawal was created"
@@ -77,7 +77,7 @@ class LightningWithdrawalCondensed(BaseModel, BaseConfig):
     )
 
 
-class OnChainWithdrawalCondensed(BaseModel, BaseConfig):
+class GetOnChainWithdrawalsResponse(BaseModel, BaseConfig):
     address: str = Field(..., description="Address to withdraw to")
     amount: float = Field(..., description="Amount to withdraw")
     created_at: str = Field(
@@ -145,11 +145,11 @@ class WithdrawOnChainResponse(BaseModel, BaseConfig):
     tx_id: None = None
 
 
-class BitcoinAddressResponse(BaseModel, BaseConfig):
+class GetBitcoinAddressResponse(BaseModel, BaseConfig):
     address: str = Field(..., description="Bitcoin address")
 
 
-class BitcoinAddressWithTimestampResponse(BaseModel, BaseConfig):
+class AddBitcoinAddressResponse(BaseModel, BaseConfig):
     address: str = Field(..., description="The generated Bitcoin address")
     created_at: str = Field(..., description="The creation time of the address")
 

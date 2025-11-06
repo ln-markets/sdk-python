@@ -21,7 +21,7 @@ class FundingSettlement(BaseModel, BaseConfig):
     time: str = Field(..., description="Funding settlement time")
 
 
-class FundingSettlementResponse(BaseModel, BaseConfig):
+class GetFundingSettlementsResponse(BaseModel, BaseConfig):
     """Funding settlement response."""
 
     data: list[FundingSettlement] = Field(

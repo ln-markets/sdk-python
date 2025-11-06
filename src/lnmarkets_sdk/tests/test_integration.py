@@ -7,7 +7,18 @@ import pytest
 from dotenv import load_dotenv
 
 from lnmarkets_sdk.http.client import APIAuthContext, APIClientConfig, LNMClient
-from lnmarkets_sdk.models.account import DepositLightningParams
+from lnmarkets_sdk.models.account import (
+    AddBitcoinAddressParams,
+    DepositLightningParams,
+    GetInternalDepositsParams,
+    GetInternalWithdrawalsParams,
+    GetLightningDepositsParams,
+    GetLightningWithdrawalsParams,
+    GetOnChainDepositsParams,
+    WithdrawInternalParams,
+    WithdrawLightningParams,
+    WithdrawOnChainParams,
+)
 from lnmarkets_sdk.models.futures_isolated import FuturesOrder
 
 load_dotenv()
@@ -16,8 +27,14 @@ load_dotenv()
 # Add delay between tests to avoid rate limiting
 @pytest.fixture
 async def public_rate_limit_delay():
-    """Add delay between tests to avoid rate limiting."""
-    await asyncio.sleep(1)  # 1s delay between tests
+    """Add delay between tests for public endpoints to avoid rate limiting."""
+    await asyncio.sleep(0.5)  # 0.5s delay between tests (2 requests per second)
+
+
+@pytest.fixture
+async def auth_rate_limit_delay():
+    """Add delay between tests for authentication endpoints to avoid rate limiting."""
+    await asyncio.sleep(0.1)  # 0.1s delay between tests (10 requests per second)
 
 
 def create_public_config() -> APIClientConfig:
@@ -55,6 +72,7 @@ class TestBasicsIntegration:
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("auth_rate_limit_delay")
 class TestAccountIntegration:
     """Integration tests for account endpoints (require authentication)."""
 
@@ -75,6 +93,32 @@ class TestAccountIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
+    async def test_get_bitcoin_address(self):
+        async with LNMClient(create_auth_config()) as client:
+            result = await client.account.get_bitcoin_address()
+            assert result.address is not None
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_add_bitcoin_address(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = AddBitcoinAddressParams(format="p2wpkh")
+            try:
+                result = await client.account.add_bitcoin_address(params)
+                assert result.address is not None
+                assert result.created_at is not None
+            except Exception as e:
+                assert (
+                    "You have too many unused addresses. Please use one of them."
+                    in str(e)
+                )
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
     async def test_deposit_lightning(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositLightningParams(amount=100_000)
@@ -82,25 +126,149 @@ class TestAccountIntegration:
             assert result.deposit_id is not None
             assert result.payment_request.startswith("ln")
 
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_withdraw_lightning(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = WithdrawLightningParams(invoice="test_invoice")
+            try:
+                result = await client.account.withdraw_lightning(params)
+                assert result.id is not None
+                assert result.amount is not None
+                assert result.max_fees is not None
+            except Exception as e:
+                assert "Send a correct BOLT 11 invoice" in str(e)
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_withdraw_internal(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = WithdrawInternalParams(amount=100_000, to_username="test_username")
+            try:
+                result = await client.account.withdraw_internal(params)
+                assert result.id is not None
+                assert result.amount is not None
+                assert result.created_at is not None
+                assert result.from_uid is not None
+                assert result.to_uid is not None
+            except Exception as e:
+                assert "User not found" in str(e)
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_withdraw_on_chain(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = WithdrawOnChainParams(amount=100_000, address="test_address")
+            try:
+                result = await client.account.withdraw_on_chain(params)
+                assert result.id is not None
+                assert result.amount is not None
+                assert result.created_at is not None
+            except Exception as e:
+                assert "Invalid address" in str(e)
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_get_lightning_deposits(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetLightningDepositsParams(limit=2)
+            result = await client.account.get_lightning_deposits(params)
+            assert len(result) <= params.limit
+            if len(result) > 0:
+                assert result[0].id is not None
+                assert result[0].created_at is not None
+                assert result[0].amount is not None
+                assert result[0].comment is None
+                assert result[0].settled_at is None
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_get_lightning_withdrawals(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetLightningWithdrawalsParams(limit=2)
+            result = await client.account.get_lightning_withdrawals(params)
+            assert len(result) <= params.limit
+            if len(result) > 0:
+                assert result[0].id is not None
+                assert result[0].created_at is not None
+                assert result[0].amount is not None
+                assert result[0].fee is not None
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_get_internal_deposits(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetInternalDepositsParams(limit=2)
+            result = await client.account.get_internal_deposits(params)
+            assert len(result) <= params.limit
+            if len(result) > 0:
+                assert result[0].id is not None
+                assert result[0].created_at is not None
+                assert result[0].amount is not None
+                assert result[0].from_username is not None
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_get_internal_withdrawals(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetInternalWithdrawalsParams(limit=2)
+            result = await client.account.get_internal_withdrawals(params)
+            assert len(result) <= params.limit
+            if len(result) > 0:
+                assert result[0].id is not None
+                assert result[0].created_at is not None
+                assert result[0].amount is not None
+                assert result[0].to_username is not None
+
+    @pytest.mark.skipif(
+        not os.environ.get("V3_API_KEY"),
+        reason="V3_API_KEY not set in environment",
+    )
+    async def test_get_on_chain_deposits(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetOnChainDepositsParams(limit=2)
+            try:
+                result = await client.account.get_on_chain_deposits(params)
+                assert len(result) <= params.limit
+                if len(result) > 0:
+                    assert result[0].id is not None
+                    assert result[0].created_at is not None
+                    assert result[0].amount is not None
+                    assert result[0].block_height is not None
+            except Exception as e:
+                assert "HTTP 404: Not found" in str(e)
+
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("public_rate_limit_delay")
 class TestFuturesIntegration:
-    """Integration tests for futures endpoints."""
+    """Integration tests for futures data endpoints."""
 
-    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_ticker(self):
         async with LNMClient(create_public_config()) as client:
             ticker = await client.futures.get_ticker()
             assert ticker.index > 0
             assert ticker.last_price > 0
 
-    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_leaderboard(self):
         async with LNMClient(create_public_config()) as client:
             leaderboard = await client.futures.get_leaderboard()
             assert isinstance(leaderboard.daily, list)
 
-    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_candles(self):
         from lnmarkets_sdk.models.futures_data import GetCandlesParams
 
@@ -116,6 +284,10 @@ class TestFuturesIntegration:
             assert candles[0].low > 0
             assert candles[0].close > 0
 
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("auth_rate_limit_delay")
+class TestFuturesIsolatedIntegration:
     @pytest.mark.skipif(
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
