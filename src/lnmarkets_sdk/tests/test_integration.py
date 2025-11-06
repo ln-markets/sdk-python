@@ -14,10 +14,9 @@ load_dotenv()
 
 
 # Add delay between tests to avoid rate limiting
-@pytest.fixture(autouse=True)
-async def rate_limit_delay():
+@pytest.fixture
+async def public_rate_limit_delay():
     """Add delay between tests to avoid rate limiting."""
-    yield
     await asyncio.sleep(1)  # 1s delay between tests
 
 
@@ -38,16 +37,16 @@ def create_auth_config() -> APIClientConfig:
     )
 
 
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("public_rate_limit_delay")
 class TestBasicsIntegration:
     """Integration tests for basic API endpoints."""
 
-    @pytest.mark.asyncio
     async def test_ping(self):
         async with LNMClient(create_public_config()) as client:
             result = await client.ping()
             assert "pong" in result
 
-    @pytest.mark.asyncio
     async def test_time(self):
         async with LNMClient(create_public_config()) as client:
             result = await client.request("GET", "/time")
@@ -55,6 +54,7 @@ class TestBasicsIntegration:
             assert isinstance(result["time"], str)
 
 
+@pytest.mark.asyncio
 class TestAccountIntegration:
     """Integration tests for account endpoints (require authentication)."""
 
@@ -62,7 +62,6 @@ class TestAccountIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_get_account(self):
         async with LNMClient(create_auth_config()) as client:
             account = await client.account.get_account()
@@ -76,7 +75,6 @@ class TestAccountIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_deposit_lightning(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositLightningParams(amount=100_000)
@@ -85,23 +83,24 @@ class TestAccountIntegration:
             assert result.payment_request.startswith("ln")
 
 
+@pytest.mark.asyncio
 class TestFuturesIntegration:
     """Integration tests for futures endpoints."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_ticker(self):
         async with LNMClient(create_public_config()) as client:
             ticker = await client.futures.get_ticker()
             assert ticker.index > 0
             assert ticker.last_price > 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_leaderboard(self):
         async with LNMClient(create_public_config()) as client:
             leaderboard = await client.futures.get_leaderboard()
             assert isinstance(leaderboard.daily, list)
 
-    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("public_rate_limit_delay")
     async def test_get_candles(self):
         from lnmarkets_sdk.models.futures_data import GetCandlesParams
 
@@ -121,7 +120,6 @@ class TestFuturesIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_futures_isolated(self):
         async with LNMClient(create_auth_config()) as client:
             # Create a new trade
@@ -154,6 +152,7 @@ class TestFuturesIntegration:
             assert canceled.canceled is True
 
 
+@pytest.mark.asyncio
 class TestFuturesCrossIntegration:
     """Integration tests for cross margin futures."""
 
@@ -161,7 +160,6 @@ class TestFuturesCrossIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_get_position(self):
         async with LNMClient(create_auth_config()) as client:
             position = await client.futures.cross.get_position()
@@ -172,7 +170,6 @@ class TestFuturesCrossIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_cross_orders(self):
         async with LNMClient(create_auth_config()) as client:
             # Get open orders
@@ -187,17 +184,16 @@ class TestFuturesCrossIntegration:
             assert isinstance(filled_orders, list)
 
 
+@pytest.mark.asyncio
 class TestOracleIntegration:
     """Integration tests for oracle endpoints."""
 
-    @pytest.mark.asyncio
     async def test_get_last_price(self):
         async with LNMClient(create_public_config()) as client:
             result = await client.oracle.get_last_price()
             assert result[0].last_price > 0
             assert result[0].time is not None
 
-    @pytest.mark.asyncio
     async def test_get_index(self):
         from lnmarkets_sdk.models.oracle import GetIndexParams
 
@@ -209,10 +205,10 @@ class TestOracleIntegration:
             assert result[0].index > 0
 
 
+@pytest.mark.asyncio
 class TestSyntheticUSDIntegration:
     """Integration tests for synthetic USD endpoints."""
 
-    @pytest.mark.asyncio
     async def test_get_best_price(self):
         async with LNMClient(create_public_config()) as client:
             result = await client.synthetic_usd.get_best_price()
@@ -222,7 +218,6 @@ class TestSyntheticUSDIntegration:
         not os.environ.get("V3_API_KEY"),
         reason="V3_API_KEY not set in environment",
     )
-    @pytest.mark.asyncio
     async def test_get_swaps(self):
         from lnmarkets_sdk.models.synthetic_usd import GetSwapsParams
 

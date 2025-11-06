@@ -38,11 +38,12 @@ jobs:
         run: uv run pyright
 
       - name: Run tests
-        run: uv run pytest
+        run: |
+          uv run --isolated --python=3.12 pytest
+          uv run --isolated --python=3.13 pytest
+          uv run --isolated --python=3.14 pytest
+
         env:
-          V2_API_KEY: ${{ secrets.V2_API_KEY }}
-          V2_API_KEY_SECRET: ${{ secrets.V2_API_KEY_SECRET }}
-          V2_API_KEY_PASSPHRASE: ${{ secrets.V2_API_KEY_PASSPHRASE }}
           V3_API_KEY: ${{ secrets.V3_API_KEY }}
           V3_API_KEY_SECRET: ${{ secrets.V3_API_KEY_SECRET }}
           V3_API_KEY_PASSPHRASE: ${{ secrets.V3_API_KEY_PASSPHRASE }}
