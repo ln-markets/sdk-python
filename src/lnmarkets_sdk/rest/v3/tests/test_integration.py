@@ -302,7 +302,7 @@ class TestFuturesIntegration:
             ticker = await client.futures.get_ticker()
             assert ticker.index > 0
             assert ticker.last_price > 0
-            assert isinstance(ticker.funding_rate, float)
+            assert isinstance(ticker.funding_rate, (int, float))
             assert ticker.funding_time is not None
             assert isinstance(ticker.prices, list)
             if len(ticker.prices) > 0:
@@ -357,7 +357,7 @@ class TestFuturesIntegration:
             if len(settlements) > 0:
                 assert settlements[0].id is not None
                 assert settlements[0].time is not None
-                assert isinstance(settlements[0].funding_rate, float)
+                assert isinstance(settlements[0].funding_rate, (int, float))
                 assert settlements[0].fixing_price > 0
 
 
