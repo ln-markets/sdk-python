@@ -18,7 +18,7 @@ from lnmarkets_sdk.stream.v1.models import (
 )
 
 async def main():
-    config = StreamClientConfig(network="testnet4")
+    config = StreamClientConfig(network="signet")
     async with StreamClient(config) as client:
         await client.connect()
         await client.auth.authenticate(

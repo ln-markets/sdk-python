@@ -71,7 +71,7 @@ def create_auth_headers(
 def get_hostname(network: APINetwork) -> str:
     """Get API hostname based on network."""
     return (
-        "api.testnet4.lnmarkets.com" if network == "testnet4" else "api.lnmarkets.com"
+        "api.signet.lnmarkets.com" if network == "signet" else "api.lnmarkets.com"
     )
 
 

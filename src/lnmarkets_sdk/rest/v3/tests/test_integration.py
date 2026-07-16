@@ -52,6 +52,11 @@ from lnmarkets_sdk.rest.v3.models.synthetic_usd import GetSwapsParams, NewSwapPa
 
 load_dotenv()
 
+# Minimum signet balance (sats) to run trading tests. Below this, the spending
+# tests skip with a clear "top up the faucet" message instead of failing with
+# opaque insufficient-margin / rejected-order errors.
+MIN_TRADING_BALANCE = 500_000
+
 
 # Add delay between tests to avoid rate limiting
 @pytest.fixture
@@ -67,20 +72,91 @@ async def auth_rate_limit_delay():
 
 
 def create_public_config() -> APIClientConfig:
-    """Create config for testnet4."""
-    return APIClientConfig(network="testnet4")
+    """Create config for signet."""
+    return APIClientConfig(network="signet")
 
 
 def create_auth_config() -> APIClientConfig:
-    """Create authenticated config for testnet4."""
+    """Create authenticated config for signet."""
     return APIClientConfig(
-        network="testnet4",
+        network="signet",
         authentication=APIAuthContext(
-            key=os.environ.get("TESTNET4_API_KEY", "test-key"),
-            secret=os.environ.get("TESTNET4_API_KEY_SECRET", "test-secret"),
-            passphrase=os.environ.get("TESTNET4_API_KEY_PASSPHRASE", "test-passphrase"),
+            key=os.environ.get("SIGNET_API_KEY", "test-key"),
+            secret=os.environ.get("SIGNET_API_SECRET", "test-secret"),
+            passphrase=os.environ.get("SIGNET_API_PASSPHRASE", "test-passphrase"),
         ),
     )
+
+
+@pytest.fixture(scope="session")
+def signet_balance() -> int | None:
+    """Fetch the account balance once per session (None if no credentials).
+
+    Runs in its own event loop via ``asyncio.run`` so it stays a plain sync
+    fixture, sidestepping pytest-asyncio's function-scoped loop.
+    """
+    if not os.environ.get("SIGNET_API_KEY"):
+        return None
+
+    async def _fetch() -> int:
+        async with LNMClient(create_auth_config()) as client:
+            account = await client.account.get_account()
+            return account.balance
+
+    return asyncio.run(_fetch())
+
+
+@pytest.fixture
+def require_funds(signet_balance: int | None) -> None:
+    """Skip a spending test when the signet balance is below the floor."""
+    # None => no credentials; the test's own skipif already handles that.
+    if signet_balance is not None and signet_balance < MIN_TRADING_BALANCE:
+        pytest.skip(
+            f"signet balance {signet_balance} < {MIN_TRADING_BALANCE} sats; "
+            "top up via the signet faucet"
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_signet_state():
+    """Reconcile signet state after the whole suite runs (pass or fail).
+
+    Cancels resting orders/trades, closes running trades and the cross
+    position, and returns cross margin to the main balance so leftovers from
+    one run don't skew the next. Every step is best-effort: a failure here must
+    never fail the suite.
+    """
+    yield
+    if not os.environ.get("SIGNET_API_KEY"):
+        return
+
+    async def _cleanup() -> None:
+        async with LNMClient(create_auth_config()) as client:
+            # Cancel resting limit orders/trades that never filled.
+            with contextlib.suppress(APIException):
+                await client.futures.isolated.cancel_all()
+            with contextlib.suppress(APIException):
+                await client.futures.cross.cancel_all()
+            # Close any running isolated trades individually.
+            with contextlib.suppress(APIException):
+                for trade in await client.futures.isolated.get_running_trades():
+                    with contextlib.suppress(APIException):
+                        await client.futures.isolated.close(
+                            CloseTradeParams(id=trade.id)
+                        )
+            # Close the cross position, then withdraw its freed margin back to
+            # the main balance so deposits don't accumulate across runs.
+            with contextlib.suppress(APIException):
+                await client.futures.cross.close()
+            with contextlib.suppress(APIException):
+                position = await client.futures.cross.get_position()
+                if position.margin > 0:
+                    await client.futures.cross.withdraw(
+                        WithdrawParams(amount=position.margin)
+                    )
+
+    with contextlib.suppress(Exception):
+        asyncio.run(_cleanup())
 
 
 @pytest.mark.asyncio
@@ -106,8 +182,8 @@ class TestAccountIntegration:
     """Integration tests for account endpoints (require authentication)."""
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_account(self):
         async with LNMClient(create_auth_config()) as client:
@@ -124,8 +200,8 @@ class TestAccountIntegration:
                 assert isinstance(account.linking_public_key, str)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_bitcoin_address(self):
         async with LNMClient(create_auth_config()) as client:
@@ -133,8 +209,8 @@ class TestAccountIntegration:
             assert result.address is not None
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_add_bitcoin_address(self):
         async with LNMClient(create_auth_config()) as client:
@@ -150,8 +226,8 @@ class TestAccountIntegration:
                 )
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_deposit_lightning(self):
         async with LNMClient(create_auth_config()) as client:
@@ -161,8 +237,8 @@ class TestAccountIntegration:
             assert result.payment_request.startswith("ln")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_withdraw_lightning(self):
         async with LNMClient(create_auth_config()) as client:
@@ -177,8 +253,8 @@ class TestAccountIntegration:
                 assert "Send a correct BOLT 11 invoice" in str(e)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_withdraw_on_chain(self):
         async with LNMClient(create_auth_config()) as client:
@@ -196,8 +272,8 @@ class TestAccountIntegration:
                 assert "Invalid address" in str(e)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_lightning_deposits(self):
         async with LNMClient(create_auth_config()) as client:
@@ -221,8 +297,8 @@ class TestAccountIntegration:
                     assert isinstance(data[0].settled_at, str)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_lightning_withdrawals(self):
         async with LNMClient(create_auth_config()) as client:
@@ -239,8 +315,8 @@ class TestAccountIntegration:
                 assert data[0].status in ["failed", "processed", "processing"]
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_on_chain_deposits(self):
         async with LNMClient(create_auth_config()) as client:
@@ -262,8 +338,8 @@ class TestAccountIntegration:
                 assert "HTTP 404: Not found" in str(e)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_on_chain_withdrawals(self):
         async with LNMClient(create_auth_config()) as client:
@@ -367,9 +443,10 @@ class TestFuturesIsolatedIntegration:
     """Integration tests for isolated margin futures endpoints."""
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_trade(self):
         async with LNMClient(create_auth_config()) as client:
             params = FuturesOrder(
@@ -403,8 +480,8 @@ class TestFuturesIsolatedIntegration:
                 pytest.skip("Could not create a new trade: " + str(e))
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_open_trades(self):
         async with LNMClient(create_auth_config()) as client:
@@ -423,8 +500,8 @@ class TestFuturesIsolatedIntegration:
                 assert open_trade.leverage > 0
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_running_trades(self):
         async with LNMClient(create_auth_config()) as client:
@@ -440,8 +517,8 @@ class TestFuturesIsolatedIntegration:
                 assert running_trade.pl is not None
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_closed_trades(self):
         async with LNMClient(create_auth_config()) as client:
@@ -461,9 +538,10 @@ class TestFuturesIsolatedIntegration:
                 assert isinstance(closed_trade.closed_at, str)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_cancel_trade(self):
         async with LNMClient(create_auth_config()) as client:
             # Create a trade first
@@ -487,8 +565,8 @@ class TestFuturesIsolatedIntegration:
                 pytest.skip("No running trades to cancel")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_cancel_all_trades(self):
         async with LNMClient(create_auth_config()) as client:
@@ -500,9 +578,10 @@ class TestFuturesIsolatedIntegration:
                 assert canceled.running is False
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_close_trade(self):
         async with LNMClient(create_auth_config()) as client:
             # Create a running trade first (market order)
@@ -527,8 +606,8 @@ class TestFuturesIsolatedIntegration:
                 assert len(str(e)) > 0
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_add_margin(self):
         async with LNMClient(create_auth_config()) as client:
@@ -553,8 +632,8 @@ class TestFuturesIsolatedIntegration:
             assert updated.margin >= trade.margin
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_cash_in(self):
         async with LNMClient(create_auth_config()) as client:
@@ -577,8 +656,8 @@ class TestFuturesIsolatedIntegration:
             assert updated.running is True
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_update_stoploss(self):
         async with LNMClient(create_auth_config()) as client:
@@ -610,8 +689,8 @@ class TestFuturesIsolatedIntegration:
                     )
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_update_takeprofit(self):
         async with LNMClient(create_auth_config()) as client:
@@ -646,8 +725,8 @@ class TestFuturesIsolatedIntegration:
                     )
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_funding_fees_isolated(self):
         async with LNMClient(create_auth_config()) as client:
@@ -672,8 +751,8 @@ class TestFuturesCrossIntegration:
     """Integration tests for cross margin futures."""
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_position(self):
         async with LNMClient(create_auth_config()) as client:
@@ -696,9 +775,10 @@ class TestFuturesCrossIntegration:
                 assert position.liquidation > 0
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_order(self):
         async with LNMClient(create_auth_config()) as client:
             params = FuturesCrossOrderLimit(
@@ -721,8 +801,8 @@ class TestFuturesCrossIntegration:
                 pytest.skip(f"Could not create order: {str(e)}")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_open_orders(self):
         async with LNMClient(create_auth_config()) as client:
@@ -742,8 +822,8 @@ class TestFuturesCrossIntegration:
                 assert order.created_at is not None
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_filled_orders(self):
         async with LNMClient(create_auth_config()) as client:
@@ -769,9 +849,10 @@ class TestFuturesCrossIntegration:
                     assert isinstance(order.filled_at, str)
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_cancel_order(self):
         async with LNMClient(create_auth_config()) as client:
             # Create an order first
@@ -795,8 +876,8 @@ class TestFuturesCrossIntegration:
                 pytest.skip("No running orders to cancel")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_cancel_all_orders(self):
         async with LNMClient(create_auth_config()) as client:
@@ -808,8 +889,8 @@ class TestFuturesCrossIntegration:
                 assert canceled.filled is False
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_close_position(self):
         async with LNMClient(create_auth_config()) as client:
@@ -824,9 +905,10 @@ class TestFuturesCrossIntegration:
                 pytest.skip("No position to close")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_deposit(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositParams(amount=10_000)
@@ -836,8 +918,8 @@ class TestFuturesCrossIntegration:
             assert position.leverage > 0
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_withdraw(self):
         async with LNMClient(create_auth_config()) as client:
@@ -853,8 +935,8 @@ class TestFuturesCrossIntegration:
                 pytest.skip("Insufficient margin to test withdraw")
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_set_leverage(self):
         async with LNMClient(create_auth_config()) as client:
@@ -864,8 +946,8 @@ class TestFuturesCrossIntegration:
             assert position.leverage == 50
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_transfers(self):
         async with LNMClient(create_auth_config()) as client:
@@ -882,8 +964,8 @@ class TestFuturesCrossIntegration:
                 assert transfers[0].time is not None
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_funding_fees_cross(self):
         async with LNMClient(create_auth_config()) as client:
@@ -937,8 +1019,8 @@ class TestSyntheticUSDIntegration:
             assert result.bid_price > 0
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
     async def test_get_swaps(self):
         async with LNMClient(create_auth_config()) as client:
@@ -958,9 +1040,10 @@ class TestSyntheticUSDIntegration:
                 assert swaps[0].out_asset in ["BTC", "USD"]
 
     @pytest.mark.skipif(
-        not os.environ.get("TESTNET4_API_KEY"),
-        reason="TESTNET4_API_KEY not set in environment",
+        not os.environ.get("SIGNET_API_KEY"),
+        reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_swap(self):
         async with LNMClient(create_auth_config()) as client:
             # Try to create a swap (may fail due to insufficient balance or other reasons)

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-07-16
+
+### Added
+
+- Automatic retry with exponential backoff for transient failures. `LNMClient` now retries `503`/`502`/`504`/`429` responses and connection-phase transport errors (`ConnectError`, `ConnectTimeout`, `PoolTimeout`), honoring a `Retry-After` header on `429`. Read/write timeouts are deliberately not retried, so non-idempotent trades cannot be double-submitted. The auth signature is regenerated on every attempt so its timestamp stays fresh across backoff delays.
+- Retry configuration on `APIClientConfig`: `max_retries` (default `3`), `retry_base_delay` (default `1.0`s), `retry_max_delay` (default `8.0`s). Set `max_retries=0` to disable retrying. The base delay defaults to the rate-limit window so retries never trigger a `429`.
+- `tenacity` dependency (backoff engine).
+
+### Changed
+
+- Migrated the test/dev network from `testnet4` to `signet`. The `APINetwork` type is now `"mainnet" | "signet"` (was `"testnet4"`) and the resolved host is `api.signet.lnmarkets.com`. Pass `network="signet"` instead of `network="testnet4"`.
+- Integration tests now guarantee cleanup and guard against low funds: a session teardown cancels resting orders/trades, closes running trades and the cross position, and returns cross margin to the balance (best-effort, never fails the suite); a balance-floor guard skips trading tests when signet funds run low instead of failing with opaque insufficient-margin errors.
+
+## [0.1.3] - 2026-07-03
+
+No user-facing library changes; identical behavior to 0.1.2 (release and CI tooling only).
+
 ## [0.1.2] - 2026-07-02
 
 ### Added
