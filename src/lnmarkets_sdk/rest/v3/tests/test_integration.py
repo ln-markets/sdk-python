@@ -52,6 +52,11 @@ from lnmarkets_sdk.rest.v3.models.synthetic_usd import GetSwapsParams, NewSwapPa
 
 load_dotenv()
 
+# Minimum signet balance (sats) to run trading tests. Below this, the spending
+# tests skip with a clear "top up the faucet" message instead of failing with
+# opaque insufficient-margin / rejected-order errors.
+MIN_TRADING_BALANCE = 500_000
+
 
 # Add delay between tests to avoid rate limiting
 @pytest.fixture
@@ -81,6 +86,77 @@ def create_auth_config() -> APIClientConfig:
             passphrase=os.environ.get("SIGNET_API_PASSPHRASE", "test-passphrase"),
         ),
     )
+
+
+@pytest.fixture(scope="session")
+def signet_balance() -> int | None:
+    """Fetch the account balance once per session (None if no credentials).
+
+    Runs in its own event loop via ``asyncio.run`` so it stays a plain sync
+    fixture, sidestepping pytest-asyncio's function-scoped loop.
+    """
+    if not os.environ.get("SIGNET_API_KEY"):
+        return None
+
+    async def _fetch() -> int:
+        async with LNMClient(create_auth_config()) as client:
+            account = await client.account.get_account()
+            return account.balance
+
+    return asyncio.run(_fetch())
+
+
+@pytest.fixture
+def require_funds(signet_balance: int | None) -> None:
+    """Skip a spending test when the signet balance is below the floor."""
+    # None => no credentials; the test's own skipif already handles that.
+    if signet_balance is not None and signet_balance < MIN_TRADING_BALANCE:
+        pytest.skip(
+            f"signet balance {signet_balance} < {MIN_TRADING_BALANCE} sats; "
+            "top up via the signet faucet"
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_signet_state():
+    """Reconcile signet state after the whole suite runs (pass or fail).
+
+    Cancels resting orders/trades, closes running trades and the cross
+    position, and returns cross margin to the main balance so leftovers from
+    one run don't skew the next. Every step is best-effort: a failure here must
+    never fail the suite.
+    """
+    yield
+    if not os.environ.get("SIGNET_API_KEY"):
+        return
+
+    async def _cleanup() -> None:
+        async with LNMClient(create_auth_config()) as client:
+            # Cancel resting limit orders/trades that never filled.
+            with contextlib.suppress(APIException):
+                await client.futures.isolated.cancel_all()
+            with contextlib.suppress(APIException):
+                await client.futures.cross.cancel_all()
+            # Close any running isolated trades individually.
+            with contextlib.suppress(APIException):
+                for trade in await client.futures.isolated.get_running_trades():
+                    with contextlib.suppress(APIException):
+                        await client.futures.isolated.close(
+                            CloseTradeParams(id=trade.id)
+                        )
+            # Close the cross position, then withdraw its freed margin back to
+            # the main balance so deposits don't accumulate across runs.
+            with contextlib.suppress(APIException):
+                await client.futures.cross.close()
+            with contextlib.suppress(APIException):
+                position = await client.futures.cross.get_position()
+                if position.margin > 0:
+                    await client.futures.cross.withdraw(
+                        WithdrawParams(amount=position.margin)
+                    )
+
+    with contextlib.suppress(Exception):
+        asyncio.run(_cleanup())
 
 
 @pytest.mark.asyncio
@@ -370,6 +446,7 @@ class TestFuturesIsolatedIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_trade(self):
         async with LNMClient(create_auth_config()) as client:
             params = FuturesOrder(
@@ -464,6 +541,7 @@ class TestFuturesIsolatedIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_cancel_trade(self):
         async with LNMClient(create_auth_config()) as client:
             # Create a trade first
@@ -503,6 +581,7 @@ class TestFuturesIsolatedIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_close_trade(self):
         async with LNMClient(create_auth_config()) as client:
             # Create a running trade first (market order)
@@ -699,6 +778,7 @@ class TestFuturesCrossIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_order(self):
         async with LNMClient(create_auth_config()) as client:
             params = FuturesCrossOrderLimit(
@@ -772,6 +852,7 @@ class TestFuturesCrossIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_cancel_order(self):
         async with LNMClient(create_auth_config()) as client:
             # Create an order first
@@ -827,6 +908,7 @@ class TestFuturesCrossIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_deposit(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositParams(amount=10_000)
@@ -961,6 +1043,7 @@ class TestSyntheticUSDIntegration:
         not os.environ.get("SIGNET_API_KEY"),
         reason="SIGNET_API_KEY not set in environment",
     )
+    @pytest.mark.usefixtures("require_funds")
     async def test_new_swap(self):
         async with LNMClient(create_auth_config()) as client:
             # Try to create a swap (may fail due to insufficient balance or other reasons)
