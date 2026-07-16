@@ -78,6 +78,9 @@ class LNMClient:
             timeout=config.timeout,
             auth=auth,
             custom_headers=config.custom_headers,
+            max_retries=config.max_retries,
+            retry_base_delay=config.retry_base_delay,
+            retry_max_delay=config.retry_max_delay,
         )
 
         self.account = AccountClient(self)

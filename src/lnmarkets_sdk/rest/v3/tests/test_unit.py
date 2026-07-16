@@ -11,8 +11,10 @@ import json
 from base64 import b64encode
 from urllib.parse import urlencode
 
+import pytest
 from pytest_httpx import HTTPXMock
 
+from lnmarkets_sdk.rest.v3._internal.models import APIException
 from lnmarkets_sdk.rest.v3._internal.utils import prepare_params
 from lnmarkets_sdk.rest.v3.http.client import (
     APIAuthContext,
@@ -40,6 +42,32 @@ def _auth_config() -> APIClientConfig:
             passphrase="test-passphrase",
         ),
     )
+
+
+def _retry_config(max_retries: int = 2) -> APIClientConfig:
+    """Auth config with tiny backoff delays so retry tests run fast."""
+    return APIClientConfig(
+        network="signet",
+        authentication=APIAuthContext(
+            key="test-key",
+            secret=SECRET,
+            passphrase="test-passphrase",
+        ),
+        max_retries=max_retries,
+        retry_base_delay=0.01,
+        retry_max_delay=0.02,
+    )
+
+
+def _no_wait_client(config: APIClientConfig) -> LNMClient:
+    """Build a client whose backoff sleeps for zero seconds (keeps tests fast)."""
+    client = LNMClient(config)
+    client._base_client._backoff = lambda _rs: 0.0  # type: ignore[assignment]
+    return client
+
+
+def _error_body(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
 
 
 def _running_trade_payload() -> dict[str, object]:
@@ -203,3 +231,100 @@ async def test_remove_takeprofit_uses_delete_with_query_params(
     assert request.url.path == "/v3/futures/isolated/trade/takeprofit"
     assert request.url.params["id"] == TRADE_ID
     assert request.read() == b""
+
+
+async def test_retries_on_503_then_succeeds(httpx_mock: HTTPXMock) -> None:
+    # First call flaps with the "Trading engine temporarily unavailable" 503,
+    # the retry then succeeds.
+    httpx_mock.add_response(
+        status_code=503,
+        json=_error_body(
+            "SERVICE_UNAVAILABLE", "Trading engine is temporarily unavailable"
+        ),
+    )
+    httpx_mock.add_response(json=[])
+
+    async with _no_wait_client(_retry_config()) as client:
+        result = await client.futures.cross.cancel_all()
+
+    assert result == []
+    # Two requests went out: the failed attempt and the successful retry.
+    assert len(httpx_mock.get_requests()) == 2
+
+
+async def test_retries_exhausted_raises_api_exception(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        status_code=503,
+        json=_error_body(
+            "SERVICE_UNAVAILABLE", "Trading engine is temporarily unavailable"
+        ),
+        is_reusable=True,
+    )
+
+    with pytest.raises(APIException, match="Trading engine is temporarily unavailable"):
+        async with _no_wait_client(_retry_config(max_retries=2)) as client:
+            await client.futures.cross.cancel_all()
+
+    # Initial attempt + 2 retries.
+    assert len(httpx_mock.get_requests()) == 3
+
+
+async def test_retry_re_signs_each_attempt(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        status_code=503,
+        json=_error_body("SERVICE_UNAVAILABLE", "unavailable"),
+    )
+    httpx_mock.add_response(json=[])
+
+    async with _no_wait_client(_retry_config()) as client:
+        await client.futures.cross.cancel_all()
+
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 2
+    # Every attempt carries a freshly built (re-signed) auth header.
+    for req in requests:
+        assert req.headers.get("lnm-access-signature")
+        assert req.headers.get("lnm-access-timestamp")
+
+
+async def test_retries_on_429_rate_limit(httpx_mock: HTTPXMock) -> None:
+    # 429 is retried; a Retry-After header is honored by the wait strategy.
+    httpx_mock.add_response(
+        status_code=429,
+        headers={"Retry-After": "0"},
+        json=_error_body("TOO_MANY_REQUESTS", "rate limited"),
+    )
+    httpx_mock.add_response(json=[])
+
+    async with _no_wait_client(_retry_config()) as client:
+        result = await client.futures.cross.cancel_all()
+
+    assert result == []
+    assert len(httpx_mock.get_requests()) == 2
+
+
+async def test_non_retryable_status_is_not_retried(httpx_mock: HTTPXMock) -> None:
+    # A 400 is a client error: raise immediately, no retry.
+    httpx_mock.add_response(
+        status_code=400,
+        json=_error_body("BAD_REQUEST", "invalid params"),
+    )
+
+    with pytest.raises(APIException, match="invalid params"):
+        async with _no_wait_client(_retry_config()) as client:
+            await client.futures.cross.cancel_all()
+
+    assert len(httpx_mock.get_requests()) == 1
+
+
+async def test_max_retries_zero_disables_retry(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        status_code=503,
+        json=_error_body("SERVICE_UNAVAILABLE", "unavailable"),
+    )
+
+    with pytest.raises(APIException, match="unavailable"):
+        async with _no_wait_client(_retry_config(max_retries=0)) as client:
+            await client.futures.cross.cancel_all()
+
+    assert len(httpx_mock.get_requests()) == 1

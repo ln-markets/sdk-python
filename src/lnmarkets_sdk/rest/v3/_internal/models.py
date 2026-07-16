@@ -40,6 +40,27 @@ class APIClientConfig(BaseModel):
     hostname: str | None = None
     custom_headers: dict[str, str] | None = None
     timeout: float = Field(default=30.0, gt=0, description="Request timeout in seconds")
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        description=(
+            "Retry attempts for transient failures (503/502/504/429 and "
+            "connection errors). 0 disables retrying."
+        ),
+    )
+    retry_base_delay: float = Field(
+        default=1.0,
+        gt=0,
+        description=(
+            "Base backoff delay in seconds. Keep >= the rate-limit window "
+            "(1s public / 0.2s auth) so retries never trigger a 429."
+        ),
+    )
+    retry_max_delay: float = Field(
+        default=8.0,
+        gt=0,
+        description="Upper bound in seconds for a single backoff wait.",
+    )
 
 
 class APIError(BaseModel, BaseConfig):
