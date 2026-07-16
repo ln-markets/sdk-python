@@ -18,8 +18,8 @@ from .models import StreamAuthContext, StreamNetwork, StreamValidationException
 def get_hostname(network: StreamNetwork) -> str:
     """Stream API hostname for the given network."""
     return (
-        "stream.testnet4.lnmarkets.com"
-        if network == "testnet4"
+        "stream.signet.lnmarkets.com"
+        if network == "signet"
         else "stream.lnmarkets.com"
     )
 

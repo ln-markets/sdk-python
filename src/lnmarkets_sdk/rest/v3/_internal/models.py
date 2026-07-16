@@ -4,7 +4,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationError
 from pydantic.alias_generators import to_camel
 
-type APINetwork = Literal["mainnet", "testnet4"]
+type APINetwork = Literal["mainnet", "signet"]
 type APIMethod = Literal["GET", "POST", "PUT", "DELETE"]
 type UUID = str
 

@@ -3,19 +3,19 @@
 RPC methods covered: hello, ping, time, authenticate, whoami,
                      subscribe, unsubscribe, unsubscribe_all.
 
-Run (public-only, mainnet):
+Run (public-only, signet):
     uv run examples/stream_v1.py
 
 Authenticated run reads creds by network:
-    mainnet  -> MAINNET_API_KEY, MAINNET_API_KEY_SECRET, MAINNET_API_KEY_PASSPHRASE
-    testnet4 -> TESTNET4_API_KEY, TESTNET4_API_KEY_SECRET, TESTNET4_API_KEY_PASSPHRASE
+    signet  -> SIGNET_API_KEY, SIGNET_API_SECRET, SIGNET_API_PASSPHRASE
+    mainnet -> MAINNET_API_KEY, MAINNET_API_SECRET, MAINNET_API_PASSPHRASE
 
 Creds loaded from `.env` via `python-dotenv`:
     uv run examples/stream_v1.py --auth
 
-Defaults to mainnet. Pass --testnet4 to opt in:
-    uv run examples/stream_v1.py --testnet4
-    uv run examples/stream_v1.py --testnet4 --auth
+Defaults to signet. Pass --mainnet to opt in:
+    uv run examples/stream_v1.py --mainnet
+    uv run examples/stream_v1.py --mainnet --auth
 """
 
 from __future__ import annotations
@@ -45,17 +45,17 @@ load_dotenv()
 
 
 def resolve_creds(network: str) -> tuple[str, str, str]:
-    if network == "testnet4":
+    if network == "signet":
         key_var, secret_var, pass_var = (
-            "TESTNET4_API_KEY",
-            "TESTNET4_API_KEY_SECRET",
-            "TESTNET4_API_KEY_PASSPHRASE",
+            "SIGNET_API_KEY",
+            "SIGNET_API_SECRET",
+            "SIGNET_API_PASSPHRASE",
         )
     else:
         key_var, secret_var, pass_var = (
             "MAINNET_API_KEY",
-            "MAINNET_API_KEY_SECRET",
-            "MAINNET_API_KEY_PASSPHRASE",
+            "MAINNET_API_SECRET",
+            "MAINNET_API_PASSPHRASE",
         )
     key = os.environ.get(key_var)
     secret = os.environ.get(secret_var)
@@ -71,7 +71,7 @@ def resolve_creds(network: str) -> tuple[str, str, str]:
 
 
 async def main() -> None:
-    network = "mainnet" if "--mainnet" in sys.argv else "testnet4"
+    network = "mainnet" if "--mainnet" in sys.argv else "signet"
     want_auth = "--auth" in sys.argv
 
     if want_auth:

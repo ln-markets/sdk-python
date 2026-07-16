@@ -3,14 +3,14 @@
 Creds loaded from `.env` via `python-dotenv`.
 
 Run:
-    uv run examples/rest_v3.py                  # public-only, testnet4
-    uv run examples/rest_v3.py --auth           # authenticated, testnet4
+    uv run examples/rest_v3.py                  # public-only, signet
+    uv run examples/rest_v3.py --auth           # authenticated, signet
     uv run examples/rest_v3.py --mainnet
     uv run examples/rest_v3.py --mainnet --auth
 
 Authenticated run reads creds by network:
-    mainnet  -> MAINNET_API_KEY, MAINNET_API_KEY_SECRET, MAINNET_API_KEY_PASSPHRASE
-    testnet4 -> TESTNET4_API_KEY, TESTNET4_API_KEY_SECRET, TESTNET4_API_KEY_PASSPHRASE
+    mainnet  -> MAINNET_API_KEY, MAINNET_API_SECRET, MAINNET_API_PASSPHRASE
+    signet -> SIGNET_API_KEY, SIGNET_API_SECRET, SIGNET_API_PASSPHRASE
 """
 
 import asyncio
@@ -43,7 +43,7 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
 )
 from lnmarkets_sdk.rest.v3.models.oracle import GetLastPriceParams
 
-Network = Literal["mainnet", "testnet4"]
+Network = Literal["mainnet", "signet"]
 
 load_dotenv()
 
@@ -353,7 +353,7 @@ async def example_authenticated_endpoints(network: Network):
 
 async def main():
     """Run all examples."""
-    network: Network = "mainnet" if "--mainnet" in sys.argv else "testnet4"
+    network: Network = "mainnet" if "--mainnet" in sys.argv else "signet"
     want_auth = "--auth" in sys.argv
 
     print("\n" + "=" * 80)

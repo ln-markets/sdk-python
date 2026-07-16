@@ -33,7 +33,7 @@ SECRET = "test-secret"
 
 def _auth_config() -> APIClientConfig:
     return APIClientConfig(
-        network="testnet4",
+        network="signet",
         authentication=APIAuthContext(
             key="test-key",
             secret=SECRET,

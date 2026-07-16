@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic.alias_generators import to_camel
 
-type StreamNetwork = Literal["mainnet", "testnet4"]
+type StreamNetwork = Literal["mainnet", "signet"]
 type ConnectionState = Literal[
     "disconnected", "connecting", "connected", "reconnecting"
 ]
