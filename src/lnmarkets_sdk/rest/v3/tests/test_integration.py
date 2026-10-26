@@ -134,17 +134,6 @@ def require_funds(signet_balance: int | None) -> None:
         )
 
 
-@contextlib.contextmanager
-def skip_on_tier_limit():
-    """Skip a deposit test when the signet account hit its monthly tier limit."""
-    try:
-        yield
-    except APIException as e:
-        if e.error is not None and e.error.code == "TIER_LIMIT_EXCEEDED":
-            pytest.skip(f"signet account tier limit reached: {e.error.message}")
-        raise
-
-
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_signet_state():
     """Reconcile signet state after the whole suite runs (pass or fail).
@@ -227,8 +216,7 @@ class TestAccountIntegration:
     @requires_auth
     async def test_get_bitcoin_address(self):
         async with LNMClient(create_auth_config()) as client:
-            with skip_on_tier_limit():
-                result = await client.account.get_bitcoin_address()
+            result = await client.account.get_bitcoin_address()
             assert result.address is not None
 
     @requires_auth
@@ -236,22 +224,18 @@ class TestAccountIntegration:
         async with LNMClient(create_auth_config()) as client:
             params = AddBitcoinAddressParams(format="p2wpkh")
             try:
-                with skip_on_tier_limit():
-                    result = await client.account.add_bitcoin_address(params)
+                result = await client.account.add_bitcoin_address(params)
                 assert result.address is not None
                 assert result.created_at is not None
             except APIException as e:
-                assert (
-                    "You have too many unused addresses. Please use one of them."
-                    in str(e)
-                )
+                if "You have too many unused addresses" not in str(e):
+                    raise
 
     @requires_auth
     async def test_deposit_lightning(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositLightningParams(amount=100_000)
-            with skip_on_tier_limit():
-                result = await client.account.deposit_lightning(params)
+            result = await client.account.deposit_lightning(params)
             assert result.deposit_id is not None
             assert result.payment_request.startswith("ln")
 
