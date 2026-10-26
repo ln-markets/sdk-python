@@ -19,8 +19,14 @@ class FuturesOrder(BaseModel, BaseConfig):
     stoploss: float | None = Field(
         default=None,
         ge=0,
-        multiple_of=0.5,
-        description="Stop loss price level (0 if not set)",
+        description=(
+            "A price (stoploss_mode='fixed') or trailing distance as a fraction "
+            "of price (stoploss_mode='trailing')"
+        ),
+    )
+    stoploss_mode: Literal["fixed", "trailing"] | None = Field(
+        default=None,
+        description="How `stoploss` is interpreted. Defaults to 'fixed'.",
     )
     takeprofit: float | None = Field(
         default=None,
@@ -41,7 +47,9 @@ class FuturesOrder(BaseModel, BaseConfig):
         ..., description="Trade type: limit (limit) or market (market)"
     )
     client_id: str | None = Field(
-        default=None, description="Unique client ID for the trade"
+        default=None,
+        max_length=64,
+        description="Optional custom data field (max 64 characters)",
     )
 
     @model_validator(mode="after")

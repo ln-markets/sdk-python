@@ -40,9 +40,21 @@ class PriceBucket(BaseModel, BaseConfig):
     )
 
 
+class PriceChange24h(BaseModel, BaseConfig):
+    """24h price change."""
+
+    ratio: SkipValidation[float] = Field(
+        ..., description="Price change over the last 24 hours, as a ratio"
+    )
+    updated_at: SkipValidation[str] = Field(
+        ..., description="ISO date string when the ratio was last computed"
+    )
+
+
 class Ticker(BaseModel, BaseConfig):
     """Futures ticker data."""
 
+    time: SkipValidation[str] = Field(..., description="ISO date string of the ticker")
     funding_rate: SkipValidation[float] = Field(..., description="Current funding rate")
     funding_time: SkipValidation[str] = Field(
         ...,
@@ -57,6 +69,14 @@ class Ticker(BaseModel, BaseConfig):
     )
     prices: list[PriceBucket] = Field(
         ..., description="Price buckets for different order sizes"
+    )
+    price_change_24h: PriceChange24h | None = Field(
+        default=None,
+        alias="priceChange24h",
+        description="Price change over the last 24 hours",
+    )
+    exchanges_weights: SkipValidation[dict[str, float]] = Field(
+        ..., description="Weight of each exchange in the index (bybit, binance, okx)"
     )
 
 
@@ -91,8 +111,8 @@ class Leaderboard(BaseModel, BaseConfig):
 
 
 class GetCandlesParams(BaseModel, BaseConfig):
-    from_: str = Field(
-        ...,
+    from_: str | None = Field(
+        default=None,
         validation_alias="from",
         serialization_alias="from",
         description="Start date as a string value in ISO format",

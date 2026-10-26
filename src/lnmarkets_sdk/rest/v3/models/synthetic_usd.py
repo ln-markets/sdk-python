@@ -17,6 +17,7 @@ class Swap(BaseModel, BaseConfig):
 
 
 class CreateSwapOutput(BaseModel, BaseConfig):
+    id: SkipValidation[UUID] = Field(..., description="Swap ID")
     in_amount: SkipValidation[float] = Field(
         ...,
         description="Amount to swap (in satoshis if BTC, in dollars with 2 decimal places if USD)",

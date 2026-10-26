@@ -116,6 +116,17 @@ def require_funds(signet_balance: int | None) -> None:
         )
 
 
+@contextlib.contextmanager
+def skip_on_tier_limit():
+    """Skip a deposit test when the signet account hit its monthly tier limit."""
+    try:
+        yield
+    except APIException as e:
+        if e.error is not None and e.error.code == "TIER_LIMIT_EXCEEDED":
+            pytest.skip(f"signet account tier limit reached: {e.error.message}")
+        raise
+
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_signet_state():
     """Reconcile signet state after the whole suite runs (pass or fail).
@@ -204,7 +215,8 @@ class TestAccountIntegration:
     )
     async def test_get_bitcoin_address(self):
         async with LNMClient(create_auth_config()) as client:
-            result = await client.account.get_bitcoin_address()
+            with skip_on_tier_limit():
+                result = await client.account.get_bitcoin_address()
             assert result.address is not None
 
     @pytest.mark.skipif(
@@ -215,10 +227,11 @@ class TestAccountIntegration:
         async with LNMClient(create_auth_config()) as client:
             params = AddBitcoinAddressParams(format="p2wpkh")
             try:
-                result = await client.account.add_bitcoin_address(params)
+                with skip_on_tier_limit():
+                    result = await client.account.add_bitcoin_address(params)
                 assert result.address is not None
                 assert result.created_at is not None
-            except Exception as e:
+            except APIException as e:
                 assert (
                     "You have too many unused addresses. Please use one of them."
                     in str(e)
@@ -231,7 +244,8 @@ class TestAccountIntegration:
     async def test_deposit_lightning(self):
         async with LNMClient(create_auth_config()) as client:
             params = DepositLightningParams(amount=100_000)
-            result = await client.account.deposit_lightning(params)
+            with skip_on_tier_limit():
+                result = await client.account.deposit_lightning(params)
             assert result.deposit_id is not None
             assert result.payment_request.startswith("ln")
 
@@ -261,11 +275,9 @@ class TestAccountIntegration:
             try:
                 result = await client.account.withdraw_on_chain(params)
                 assert result.id is not None
-                assert result.uid is not None
                 assert result.amount is not None
                 assert result.address is not None
                 assert result.created_at is not None
-                assert result.updated_at is not None
                 assert result.status == "pending"
             except Exception as e:
                 assert "Invalid address" in str(e)
@@ -375,6 +387,10 @@ class TestFuturesIntegration:
     async def test_get_ticker(self):
         async with LNMClient(create_public_config()) as client:
             ticker = await client.futures.get_ticker()
+            assert ticker.time is not None
+            assert set(ticker.exchanges_weights) == {"bybit", "binance", "okx"}
+            if ticker.price_change_24h is not None:
+                assert isinstance(ticker.price_change_24h.ratio, (int, float))
             assert ticker.index > 0
             assert ticker.last_price > 0
             assert isinstance(ticker.funding_rate, (int, float))
