@@ -4,6 +4,15 @@ from pydantic import BaseModel, Field, SkipValidation
 
 from lnmarkets_sdk.rest.v3._internal.models import UUID, BaseConfig, FromToLimitParams
 
+OnChainDepositStatus = Literal[
+    "MEMPOOL",
+    "CONFIRMED",
+    "IRREVERSIBLE",
+    "under_review",
+    "not_credited",
+    "on_hold",
+]
+
 
 class Account(BaseModel, BaseConfig):
     username: SkipValidation[str] = Field(..., description="Username of the user")
@@ -41,7 +50,7 @@ class OnChainDeposit(BaseModel, BaseConfig):
     id: SkipValidation[UUID] = Field(
         ..., description="The unique identifier for the deposit"
     )
-    status: SkipValidation[Literal["MEMPOOL", "CONFIRMED", "IRREVERSIBLE"]] = Field(
+    status: SkipValidation[OnChainDepositStatus] = Field(
         ..., description="The status of the deposit"
     )
     tx_id: SkipValidation[str] = Field(
@@ -124,16 +133,10 @@ class DepositLightningResponse(BaseModel, BaseConfig):
 
 class WithdrawOnChainResponse(BaseModel, BaseConfig):
     id: SkipValidation[UUID]
-    uid: SkipValidation[UUID]
     amount: SkipValidation[float]
     address: SkipValidation[str]
     created_at: SkipValidation[str]
-    updated_at: SkipValidation[str]
-    block_id: SkipValidation[str] | None
-    confirmation_height: SkipValidation[int] | None
-    fee: SkipValidation[float] | None
     status: SkipValidation[Literal["pending"]]
-    tx_id: None = None
 
 
 class GetBitcoinAddressResponse(BaseModel, BaseConfig):
@@ -200,7 +203,7 @@ class GetLightningWithdrawalsParams(FromToLimitParams):
 
 
 class GetOnChainDepositsParams(FromToLimitParams):
-    status: Literal["MEMPOOL", "CONFIRMED", "IRREVERSIBLE"] | None = Field(
+    status: OnChainDepositStatus | None = Field(
         default=None, description="Filter by deposit status"
     )
 
@@ -229,4 +232,8 @@ class Notification(BaseModel, BaseConfig):
     )
 
 
-class GetNotificationsParams(FromToLimitParams): ...
+class GetNotificationsParams(FromToLimitParams):
+    read: bool | None = Field(
+        default=None,
+        description="Filter by read status (the API returns unread ones by default)",
+    )

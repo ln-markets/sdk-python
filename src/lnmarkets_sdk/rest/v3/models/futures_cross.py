@@ -10,7 +10,11 @@ class FuturesCrossOrderSideQuantity(BaseModel, BaseConfig):
         ..., description="Trade side: buy (long) or sell (short)"
     )
     quantity: int = Field(..., gt=0, description="Quantity of the position")
-    client_id: str
+    client_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Optional custom data field (max 64 characters)",
+    )
 
 
 class FuturesCrossOrderLimit(FuturesCrossOrderSideQuantity):

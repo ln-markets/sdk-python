@@ -41,7 +41,6 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     UpdateStoplossParams,
     UpdateTakeprofitParams,
 )
-from lnmarkets_sdk.rest.v3.models.oracle import GetLastPriceParams
 
 Network = Literal["mainnet", "signet"]
 
@@ -70,12 +69,6 @@ async def example_public_endpoints(network: Network):
         leaderboard = await client.futures.get_leaderboard()
         print("\n--- Leaderboard (Top 3 Daily) ---")
         pprint(leaderboard.daily[:3], indent=2, width=100)
-
-        # Get oracle data
-        await asyncio.sleep(1)
-        oracle_index = await client.oracle.get_index()
-        print("\n--- Oracle Index (Latest) ---")
-        pprint(oracle_index[0].model_dump() if oracle_index else "No data", indent=2)
 
         # Get synthetic USD best price
         await asyncio.sleep(1)
@@ -119,13 +112,6 @@ async def example_public_endpoints(network: Network):
             print(
                 f"Rate: {settlement.funding_rate}, Price: {settlement.fixing_price}, Time: {settlement.time}"
             )
-
-        # Get oracle last price
-        await asyncio.sleep(1)
-        last_prices = await client.oracle.get_last_price(GetLastPriceParams(limit=5))
-        print("\n--- Oracle Last Price (Last 5) ---")
-        for price in last_prices[:3]:  # Show first 3
-            print(f"Price: {price.last_price}, Time: {price.time}")
 
 
 async def example_authenticated_endpoints(network: Network):
@@ -290,10 +276,8 @@ async def example_authenticated_endpoints(network: Network):
         try:
             # Fetch the current price so the stop/take-profit levels are valid
             # whatever BTC is trading at. Prices must be a multiple of 0.5.
-            last_prices = await client.oracle.get_last_price(
-                GetLastPriceParams(limit=1)
-            )
-            price = last_prices[0].last_price
+            ticker = await client.futures.get_ticker()
+            price = ticker.last_price
             # Long trade: stop just below entry (above liquidation), take profit
             # above entry. Prices must be a multiple of 0.5.
             stoploss = round(price * 0.98 * 2) / 2

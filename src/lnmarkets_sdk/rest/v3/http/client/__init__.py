@@ -13,7 +13,6 @@ from lnmarkets_sdk.rest.v3._internal.utils import get_hostname, parse_response
 
 from .account import AccountClient
 from .futures import FuturesClient
-from .oracle import OracleClient
 from .synthetic_usd import SyntheticUSDClient
 
 
@@ -85,7 +84,6 @@ class LNMClient:
 
         self.account = AccountClient(self)
         self.futures = FuturesClient(self)
-        self.oracle = OracleClient(self)
         self.synthetic_usd = SyntheticUSDClient(self)
 
     async def __aenter__(self) -> "LNMClient":

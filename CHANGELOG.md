@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-26
+
+Models re-synced with the published v3 API reference.
+
+### Added
+
+- `Ticker.time`, `Ticker.price_change_24h` (`ratio`, `updated_at`) and `Ticker.exchanges_weights`.
+- `FuturesOrder.stoploss_mode` (`"fixed"` | `"trailing"`), so a trailing stop can be set when opening an isolated trade. `stoploss` no longer has to be a multiple of `0.5`, since a trailing distance is a fraction of the price.
+- `GetNotificationsParams.read` filter (the API returns unread notifications by default).
+- `under_review`, `not_credited` and `on_hold` on-chain deposit statuses, both as a `get_on_chain_deposits()` filter and on `OnChainDeposit.status`.
+- `CreateSwapOutput.id`.
+
+### Fixed
+
+- `account.withdraw_on_chain()` failed validation on success: `WithdrawOnChainResponse` required `uid`, `updated_at`, `block_id`, `confirmation_height` and `fee`, which the API does not return. Those fields are removed.
+- `futures.cross.new_order()` required `client_id`; it is optional (max 64 characters), as in the API.
+- `GetCandlesParams.from_` is optional, as in the API.
+
+### Removed
+
+- **Breaking:** `client.oracle` (`OracleClient`) and the `lnmarkets_sdk.rest.v3.models.oracle` module (`OracleIndex`, `OracleLastPrice`, `GetIndexParams`, `GetLastPriceParams`). LN Markets removed `GET /oracle/index` and `GET /oracle/last-price` from the API on 2026-07-17, so these methods only returned `404`. Use `client.futures.get_ticker()` (`index` and `last_price` fields) for current values and `client.futures.get_candles()` for price history.
+
 ## [0.1.4] - 2026-07-16
 
 ### Added
