@@ -46,3 +46,7 @@ jobs:
           SIGNET_API_KEY: ${{ secrets.SIGNET_API_KEY }}
           SIGNET_API_SECRET: ${{ secrets.SIGNET_API_SECRET }}
           SIGNET_API_PASSPHRASE: ${{ secrets.SIGNET_API_PASSPHRASE }}
+          # Authenticated v3 requests are geo-blocked from US runners: route them
+          # through a proxy in an allowed country. Without it, those tests skip.
+          CI_PROXY_URL: ${{ secrets.CI_PROXY_URL }}
+          HTTPS_PROXY: ${{ secrets.CI_PROXY_URL }}
