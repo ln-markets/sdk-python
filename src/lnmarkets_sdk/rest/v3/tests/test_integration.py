@@ -47,7 +47,6 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     UpdateStoplossParams,
     UpdateTakeprofitParams,
 )
-from lnmarkets_sdk.rest.v3.models.oracle import GetIndexParams
 from lnmarkets_sdk.rest.v3.models.synthetic_usd import GetSwapsParams, NewSwapParams
 
 load_dotenv()
@@ -982,29 +981,6 @@ class TestFuturesCrossIntegration:
                 assert fees[0].time is not None
                 if fees[0].trade_id is not None:
                     assert fees[0].trade_id is not None
-
-
-@pytest.mark.asyncio
-@pytest.mark.usefixtures("public_rate_limit_delay")
-class TestOracleIntegration:
-    """Integration tests for oracle endpoints."""
-
-    async def test_get_last_price(self):
-        async with LNMClient(create_public_config()) as client:
-            result = await client.oracle.get_last_price()
-            assert isinstance(result, list)
-            assert len(result) > 0
-            assert result[0].last_price > 0
-            assert result[0].time is not None
-
-    async def test_get_index(self):
-        async with LNMClient(create_public_config()) as client:
-            params = GetIndexParams(limit=5)
-            result = await client.oracle.get_index(params)
-            assert isinstance(result, list)
-            assert len(result) > 0
-            assert result[0].index > 0
-            assert result[0].time is not None
 
 
 @pytest.mark.asyncio

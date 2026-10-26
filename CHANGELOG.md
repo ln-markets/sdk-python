@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-26
+
+### Removed
+
+- **Breaking:** `client.oracle` (`OracleClient`) and the `lnmarkets_sdk.rest.v3.models.oracle` module (`OracleIndex`, `OracleLastPrice`, `GetIndexParams`, `GetLastPriceParams`). LN Markets removed `GET /oracle/index` and `GET /oracle/last-price` from the API on 2026-07-17, so these methods only returned `404`. Use `client.futures.get_ticker()` (`index` and `last_price` fields) for current values and `client.futures.get_candles()` for price history.
+
 ## [0.1.4] - 2026-07-16
 
 ### Added

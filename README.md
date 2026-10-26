@@ -124,10 +124,6 @@ client.futures.cross.set_leverage()
 client.futures.cross.get_transfers()
 client.futures.cross.get_funding_fees()
 
-# Oracle
-client.oracle.get_index()
-client.oracle.get_last_price()
-
 # Synthetic USD
 client.synthetic_usd.get_best_price()
 client.synthetic_usd.get_swaps()  # 🔒
