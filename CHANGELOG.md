@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-29
+
+Multi-market perp API (`/v3/perp`) and `GET /v3/markets`.
+
+### Added
+
+- `client.get_markets()` (`GET /v3/markets`): the released markets, plus the early-access markets your API key can access. Returns `Market` models (`lnmarkets_sdk.rest.v3.models.markets`).
+- `client.perp` (`PerpClient`) for `/v3/perp`: `get_ticker()`, `get_candles()` and `get_funding_settlements()`.
+- `client.perp.isolated` (`PerpIsolatedClient`) for `/v3/perp/isolated`: `new_trade()`, `cancel()`, `cancel_all()`, `close()`, `add_margin()`, `cash_in()`, `update_stoploss()`, `update_takeprofit()`, `remove_stoploss()`, `remove_takeprofit()`, `get_open_trades()`, `get_running_trades()`, `get_closed_trades()`, `get_canceled_trades()` and `get_funding_fees()`.
+- Perp models in `lnmarkets_sdk.rest.v3.models.perp`. Every perp call takes the market key (`instrument` + `pair`). Trades, tickers, funding settlements and funding fees include the quanto fields (`quanto_adjustment_rate`, `quanto_adjustment_fee`, `sum_quanto_adjustment_fees`), the notional fields, and the `mark` price.
+- Cursor pagination for the perp history reads: pass `next_cursor` back as `cursor`. The cursor is an object (`PerpCursor(value=..., id=...)`), sent as `cursor[value]` and `cursor[id]` in the query.
+- The public perp routes and `get_markets()` sign the request when the client has credentials, so early-access markets work.
+
+### Deprecated
+
+- `client.futures.get_ticker()`, `get_candles()`, `get_funding_settlements()` and every `client.futures.isolated` method. They still work and raise a `DeprecationWarning` that names the `client.perp` method to use with `instrument="inverse_perp", pair="btc_usd"`. `client.futures.get_leaderboard()` and `client.futures.cross` have no perp replacement yet and are not deprecated.
+
+### Fixed
+
+- Request signature for bodies with nested whole floats (e.g. `{"stoploss": {"value": 64000.0}}`): nested values are now sent as `64000`, like the server's `JSON.stringify`, so the signature matches.
+- `futures.isolated.update_takeprofit()` no longer prints its params.
+
 ## [0.2.0] - 2026-10-26
 
 Models re-synced with the published v3 API reference.

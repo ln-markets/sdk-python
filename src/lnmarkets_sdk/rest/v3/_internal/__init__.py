@@ -16,7 +16,7 @@ from tenacity import (
 )
 
 from .models import APIAuthContext, APIMethod
-from .utils import create_auth_headers, prepare_params
+from .utils import create_auth_headers, flatten_query, prepare_params
 
 # Statuses where the server signals it did NOT process the request, so a retry
 # is safe from double-submitting a non-idempotent trade. 503 = "Trading engine
@@ -110,6 +110,8 @@ class BaseClient:
             raise RuntimeError("Client must be used within async context manager")
 
         params_dict = prepare_params(params)
+        if params_dict and method in ("GET", "DELETE"):
+            params_dict = flatten_query(params_dict)
 
         async def _send() -> httpx.Response:
             client = self._client

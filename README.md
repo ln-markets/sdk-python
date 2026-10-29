@@ -13,12 +13,15 @@ For public endpoints, you can just do this:
 
 ```python
 from lnmarkets_sdk.rest.v3.http.client import LNMClient
+from lnmarkets_sdk.rest.v3.models.perp import PerpMarketKey
 import asyncio
 
 async with LNMClient() as client:
-  ticker = await client.futures.get_ticker()
+  markets = await client.get_markets()
   await asyncio.sleep(1)
-  leaderboard = await client.futures.get_leaderboard()
+  ticker = await client.perp.get_ticker(
+      PerpMarketKey(instrument="inverse_perp", pair="btc_usd")
+  )
 ```
 
 Remember to sleep between requests, as the rate limit is 1 requests per second for public endpoints.
@@ -65,6 +68,50 @@ async with LNMClient(config) as client:
     )
 ```
 
+### Perp markets
+
+LN Markets has more than one perp market: the Bitcoin perp (`inverse_perp` + `btc_usd`) and quanto perps such as qGOLD (`quanto_perp` + `xau_usdt`). The `client.perp` methods take the market key (`instrument` + `pair`). `client.get_markets()` lists the markets you can use; it also lists the early-access markets your API key can access.
+
+```python
+from lnmarkets_sdk.rest.v3.models.perp import (
+    GetPerpTradesParams,
+    PerpOrder,
+    PerpStoploss,
+    PerpTradeParams,
+    PerpUpdateTakeprofitParams,
+)
+
+GOLD = {"instrument": "quanto_perp", "pair": "xau_usdt"}
+
+async with LNMClient(config) as client:
+    trade = await client.perp.isolated.new_trade(
+        PerpOrder(
+            **GOLD,
+            type="market",
+            side="buy",
+            margin=10_000,  # or quantity=..., in the market's unit (ounces for qGOLD)
+            leverage=10,
+            stoploss=PerpStoploss(mode="trailing", value=0.05),
+        )
+    )
+    await client.perp.isolated.update_takeprofit(
+        PerpUpdateTakeprofitParams(id=trade.id, value=5_000, **GOLD)
+    )
+    closed = await client.perp.isolated.close(PerpTradeParams(id=trade.id, **GOLD))
+
+    # Reads without a market key cover every market.
+    running = await client.perp.isolated.get_running_trades()
+
+    # History reads use cursor pagination: pass `next_cursor` back as `cursor`.
+    params = GetPerpTradesParams(**GOLD, limit=50)
+    page = await client.perp.isolated.get_closed_trades(params)
+    while page.next_cursor:
+        params.cursor = page.next_cursor
+        page = await client.perp.isolated.get_closed_trades(params)
+```
+
+The `client.futures` methods that have a `client.perp` replacement (ticker, candles, funding settlements and all isolated methods) are deprecated and raise a `DeprecationWarning`. They still work and trade BTC/USD only. To move, call the `client.perp` method with the same name and `instrument="inverse_perp", pair="btc_usd"`. Note that `PerpOrder.stoploss` is an object (`PerpStoploss(mode=..., value=...)`), not a number plus `stoploss_mode`.
+
 Check our [REST example](./examples/rest_v3.py) for more details.
 
 ### Available Methods
@@ -74,6 +121,9 @@ Check our [REST example](./examples/rest_v3.py) for more details.
 ```python
 # Ping
 client.ping()
+
+# Markets
+client.get_markets()
 
 # Account 🔒
 client.account.get_account()
@@ -88,17 +138,40 @@ client.account.get_on_chain_deposits()
 client.account.get_on_chain_withdrawals()
 client.account.read_notifications()
 
-# Futures
-client.futures.get_ticker()
-client.futures.get_leaderboard()
-client.futures.get_candles()
-client.futures.get_funding_settlements()
+# Perp
+client.perp.get_ticker()
+client.perp.get_candles()
+client.perp.get_funding_settlements()
 
-# Futures Isolated 🔒
+# Perp Isolated 🔒
+client.perp.isolated.new_trade()
+client.perp.isolated.get_running_trades()
+client.perp.isolated.get_open_trades()
+client.perp.isolated.get_closed_trades()
+client.perp.isolated.get_canceled_trades()
+client.perp.isolated.close()
+client.perp.isolated.cancel()
+client.perp.isolated.cancel_all()
+client.perp.isolated.add_margin()
+client.perp.isolated.cash_in()
+client.perp.isolated.update_stoploss()
+client.perp.isolated.update_takeprofit()
+client.perp.isolated.remove_stoploss()
+client.perp.isolated.remove_takeprofit()
+client.perp.isolated.get_funding_fees()
+
+# Futures (BTC/USD only)
+client.futures.get_ticker()               # deprecated, use client.perp
+client.futures.get_leaderboard()
+client.futures.get_candles()              # deprecated, use client.perp
+client.futures.get_funding_settlements()  # deprecated, use client.perp
+
+# Futures Isolated 🔒 (deprecated, use client.perp.isolated)
 client.futures.isolated.new_trade()
 client.futures.isolated.get_running_trades()
 client.futures.isolated.get_open_trades()
 client.futures.isolated.get_closed_trades()
+client.futures.isolated.get_canceled_trades()
 client.futures.isolated.close()
 client.futures.isolated.cancel()
 client.futures.isolated.cancel_all()

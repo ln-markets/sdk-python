@@ -10,9 +10,11 @@ from lnmarkets_sdk.rest.v3._internal.models import (
     APIMethod,
 )
 from lnmarkets_sdk.rest.v3._internal.utils import get_hostname, parse_response
+from lnmarkets_sdk.rest.v3.models.markets import Market
 
 from .account import AccountClient
 from .futures import FuturesClient
+from .perp import PerpClient
 from .synthetic_usd import SyntheticUSDClient
 
 
@@ -35,7 +37,7 @@ class LNMClient:
         Example:
         ```python
         from lnmarkets_sdk.rest.v3.http.client import LNMClient, APIClientConfig, APIAuthContext
-        from lnmarkets_sdk.rest.v3.models.futures_isolated import FuturesOrder
+        from lnmarkets_sdk.rest.v3.models.perp import PerpMarketKey, PerpOrder
 
         config = APIClientConfig(
             authentication=APIAuthContext(
@@ -52,17 +54,21 @@ class LNMClient:
             account = await client.account.get_account()
 
             # Get market ticker
-            ticker = await client.futures.get_ticker()
+            ticker = await client.perp.get_ticker(
+                PerpMarketKey(instrument="inverse_perp", pair="btc_usd")
+            )
 
-            # Place a futures order
-            params = FuturesOrder(
+            # Place a perp order
+            params = PerpOrder(
+                instrument="inverse_perp",
+                pair="btc_usd",
                 type="limit",  # limit order
                 side="buy",  # buy
                 price=100_000,
                 quantity=1,
                 leverage=100,
             )
-            order = await client.futures.isolated.new_trade(params)
+            order = await client.perp.isolated.new_trade(params)
         ```
         """
         if config is None:
@@ -84,6 +90,7 @@ class LNMClient:
 
         self.account = AccountClient(self)
         self.futures = FuturesClient(self)
+        self.perp = PerpClient(self)
         self.synthetic_usd = SyntheticUSDClient(self)
 
     async def __aenter__(self) -> "LNMClient":
@@ -94,6 +101,11 @@ class LNMClient:
     async def __aexit__(self, *args: object) -> None:
         """Exit async context manager."""
         await self._base_client.__aexit__(*args)
+
+    @property
+    def authenticated(self) -> bool:
+        """Whether the client has API credentials."""
+        return self._base_client.auth is not None
 
     async def request[T](
         self,
@@ -152,6 +164,25 @@ class LNMClient:
         ```
         """
         return await self.request_raw("GET", "/time", credentials=False)
+
+    async def get_markets(self):
+        """
+        List the markets: the released ones, plus the ones the API key can access.
+
+        Example:
+        ```python
+        async with LNMClient(config) as client:
+            markets = await client.get_markets()
+            for market in markets:
+                print(f"{market.instrument} {market.pair}: {market.display_name}")
+        ```
+        """
+        return await self.request(
+            "GET",
+            "/markets",
+            credentials=self.authenticated,
+            response_model=list[Market],
+        )
 
 
 __all__ = ["APIAuthContext", "APIClientConfig", "LNMClient"]
