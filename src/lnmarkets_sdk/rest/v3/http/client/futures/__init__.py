@@ -4,6 +4,7 @@ if TYPE_CHECKING:
     from lnmarkets_sdk.rest.v3.http.client import LNMClient
 
 from lnmarkets_sdk.rest.v3._internal.models import PaginatedResponse
+from lnmarkets_sdk.rest.v3._internal.utils import warn_deprecated
 from lnmarkets_sdk.rest.v3.models.funding_fees import FundingSettlement
 from lnmarkets_sdk.rest.v3.models.futures_data import (
     Candle,
@@ -29,6 +30,8 @@ class FuturesClient:
         """
         Get current futures ticker data.
 
+        Deprecated: use `client.perp.get_ticker()` with the BTC/USD market key.
+
         Example:
         ```python
         async with LNMClient(config) as client:
@@ -39,6 +42,7 @@ class FuturesClient:
                 print(f"Best bid: {ticker.prices[0].bid_price}")
         ```
         """
+        warn_deprecated("client.futures.get_ticker()", "client.perp.get_ticker()")
         return await self._client.request(
             "GET",
             "/futures/ticker",
@@ -71,6 +75,8 @@ class FuturesClient:
         """
         Get OHLC candle data.
 
+        Deprecated: use `client.perp.get_candles()` with the BTC/USD market key.
+
         Example:
         ```python
         from lnmarkets_sdk.rest.v3.models.futures_data import GetCandlesParams
@@ -89,6 +95,7 @@ class FuturesClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
+        warn_deprecated("client.futures.get_candles()", "client.perp.get_candles()")
         return await self._client.request(
             "GET",
             "/futures/candles",
@@ -103,6 +110,8 @@ class FuturesClient:
         """
         Get funding settlement history.
 
+        Deprecated: use `client.perp.get_funding_settlements()` with the BTC/USD market key.
+
         Example:
         ```python
         from lnmarkets_sdk.rest.v3.models.futures_data import GetFundingSettlementsParams
@@ -116,6 +125,10 @@ class FuturesClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
+        warn_deprecated(
+            "client.futures.get_funding_settlements()",
+            "client.perp.get_funding_settlements()",
+        )
         return await self._client.request(
             "GET",
             "/futures/funding-settlements",

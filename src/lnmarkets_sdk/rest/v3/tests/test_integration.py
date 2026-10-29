@@ -47,6 +47,23 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     UpdateStoplossParams,
     UpdateTakeprofitParams,
 )
+from lnmarkets_sdk.rest.v3.models.perp import (
+    GetPerpCandlesParams,
+    GetPerpFundingFeesParams,
+    GetPerpFundingSettlementsParams,
+    GetPerpTradesParams,
+    PerpAddMarginParams,
+    PerpCashInParams,
+    PerpMarketFilter,
+    PerpMarketKey,
+    PerpOpenTrade,
+    PerpOrder,
+    PerpRunningTrade,
+    PerpStoploss,
+    PerpTradeParams,
+    PerpUpdateStoplossParams,
+    PerpUpdateTakeprofitParams,
+)
 from lnmarkets_sdk.rest.v3.models.synthetic_usd import GetSwapsParams, NewSwapParams
 
 load_dotenv()
@@ -694,6 +711,188 @@ class TestFuturesIsolatedIntegration:
                 assert fees[0].time is not None
                 if fees[0].trade_id is not None:
                     assert fees[0].trade_id is not None
+
+
+BTC_USD = PerpMarketKey(instrument="inverse_perp", pair="btc_usd")
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("public_rate_limit_delay")
+class TestPerpIntegration:
+    """Integration tests for markets and perp data endpoints."""
+
+    async def test_get_markets(self):
+        async with LNMClient(create_public_config()) as client:
+            markets = await client.get_markets()
+            btc_usd = next(m for m in markets if m.id == "inverse_perp:btc_usd")
+            assert btc_usd.status == "released"
+            assert btc_usd.max_leverage is not None
+            assert btc_usd.limits.max_trade_count > 0
+
+    async def test_get_ticker(self):
+        async with LNMClient(create_public_config()) as client:
+            ticker = await client.perp.get_ticker(BTC_USD)
+            assert ticker.instrument == "inverse_perp"
+            assert ticker.pair == "btc_usd"
+            assert ticker.mark > 0
+            assert ticker.last_price > 0
+            assert isinstance(ticker.quanto_adjustment_rate, (int, float))
+            assert len(ticker.prices) > 0
+
+    async def test_get_candles_paginates(self):
+        async with LNMClient(create_public_config()) as client:
+            params = GetPerpCandlesParams(**BTC_USD.model_dump(), limit=2)
+            first = await client.perp.get_candles(params)
+            assert len(first.data) == 2
+            assert first.data[0].close > 0
+            assert first.next_cursor is not None
+
+            await asyncio.sleep(1)
+            params.cursor = first.next_cursor
+            second = await client.perp.get_candles(params)
+            assert second.data[0].time < first.data[-1].time
+
+    async def test_get_funding_settlements_paginates(self):
+        async with LNMClient(create_public_config()) as client:
+            params = GetPerpFundingSettlementsParams(**BTC_USD.model_dump(), limit=2)
+            first = await client.perp.get_funding_settlements(params)
+            assert first.pair == "btc_usd"
+            assert len(first.data) == 2
+            assert first.data[0].fixing_price > 0
+            assert first.next_cursor is not None
+
+            await asyncio.sleep(1)
+            params.cursor = first.next_cursor
+            second = await client.perp.get_funding_settlements(params)
+            assert {s.id for s in second.data}.isdisjoint({s.id for s in first.data})
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("auth_rate_limit_delay")
+class TestPerpIsolatedIntegration:
+    """Integration tests for isolated margin perp endpoints."""
+
+    @requires_auth
+    @pytest.mark.usefixtures("require_funds")
+    async def test_limit_trade_cancel(self):
+        async with LNMClient(create_auth_config()) as client:
+            ticker = await client.perp.get_ticker(BTC_USD)
+            # Far below the market so the order rests instead of filling.
+            trade = await client.perp.isolated.new_trade(
+                PerpOrder(
+                    **BTC_USD.model_dump(),
+                    type="limit",
+                    side="buy",
+                    price=round(ticker.mark * 0.5),
+                    quantity=1,
+                    leverage=10,
+                )
+            )
+            assert isinstance(trade, PerpOpenTrade)
+            assert trade.pair == "btc_usd"
+
+            open_trades = await client.perp.isolated.get_open_trades(
+                PerpMarketFilter(**BTC_USD.model_dump())
+            )
+            assert trade.id in {t.id for t in open_trades}
+
+            canceled = await client.perp.isolated.cancel(
+                PerpTradeParams(id=trade.id, **BTC_USD.model_dump())
+            )
+            assert canceled.id == trade.id
+            assert canceled.canceled is True
+
+            result = await client.perp.isolated.cancel_all(BTC_USD)
+            assert isinstance(result, list)
+
+            page = await client.perp.isolated.get_canceled_trades(
+                GetPerpTradesParams(**BTC_USD.model_dump(), limit=5)
+            )
+            assert trade.id in {t.id for t in page.data}
+
+    @requires_auth
+    @pytest.mark.usefixtures("require_funds")
+    async def test_market_trade_lifecycle(self):
+        async with LNMClient(create_auth_config()) as client:
+            trade = await client.perp.isolated.new_trade(
+                PerpOrder(
+                    **BTC_USD.model_dump(),
+                    type="market",
+                    side="buy",
+                    quantity=1,
+                    leverage=10,
+                )
+            )
+            assert isinstance(trade, PerpRunningTrade)
+            key = {"id": trade.id, **BTC_USD.model_dump()}
+            try:
+                running = await client.perp.isolated.get_running_trades()
+                assert trade.id in {t.id for t in running}
+
+                # Must sit between the liquidation price and the current price.
+                stoploss = round((trade.price + trade.liquidation) / 2)
+                updated = await client.perp.isolated.update_stoploss(
+                    PerpUpdateStoplossParams(
+                        **key, stoploss=PerpStoploss(mode="fixed", value=stoploss)
+                    )
+                )
+                assert updated.stoploss == stoploss
+                updated = await client.perp.isolated.remove_stoploss(
+                    PerpTradeParams(**key)
+                )
+                assert updated.stoploss == 0
+
+                takeprofit = round(trade.price * 1.2)
+                updated = await client.perp.isolated.update_takeprofit(
+                    PerpUpdateTakeprofitParams(**key, value=takeprofit)
+                )
+                assert updated.takeprofit == takeprofit
+                updated = await client.perp.isolated.remove_takeprofit(
+                    PerpTradeParams(**key)
+                )
+                assert updated.takeprofit == 0
+
+                updated = await client.perp.isolated.add_margin(
+                    PerpAddMarginParams(**key, amount=100)
+                )
+                assert updated.margin >= trade.margin
+                try:
+                    await client.perp.isolated.cash_in(
+                        PerpCashInParams(**key, amount=1)
+                    )
+                except APIException as e:
+                    # Max cash-in depends on live PL and leverage bounds.
+                    assert len(str(e)) > 0
+            finally:
+                closed = await client.perp.isolated.close(PerpTradeParams(**key))
+            assert closed.closed is True
+            assert closed.pair == "btc_usd"
+
+            page = await client.perp.isolated.get_closed_trades(
+                GetPerpTradesParams(**BTC_USD.model_dump(), limit=5)
+            )
+            assert trade.id in {t.id for t in page.data}
+
+    @requires_auth
+    async def test_get_closed_trades_paginates(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetPerpTradesParams(limit=1)
+            first = await client.perp.isolated.get_closed_trades(params)
+            if first.next_cursor is None:
+                pytest.skip("Not enough closed trades to paginate")
+            params.cursor = first.next_cursor
+            second = await client.perp.isolated.get_closed_trades(params)
+            assert second.data[0].id != first.data[0].id
+
+    @requires_auth
+    async def test_get_funding_fees(self):
+        async with LNMClient(create_auth_config()) as client:
+            params = GetPerpFundingFeesParams(**BTC_USD.model_dump(), limit=5)
+            result = await client.perp.isolated.get_funding_fees(params)
+            assert len(result.data) <= params.limit
+            for fee in result.data:
+                assert fee.pair == "btc_usd"
+                assert fee.trade_id is not None
 
 
 @pytest.mark.asyncio

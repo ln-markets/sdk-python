@@ -12,6 +12,7 @@ from base64 import b64encode
 from urllib.parse import urlencode
 
 import pytest
+from pydantic import ValidationError
 from pytest_httpx import HTTPXMock
 
 from lnmarkets_sdk.rest.v3._internal.models import APIException
@@ -27,6 +28,18 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     RemoveStoplossParams,
     RemoveTakeprofitParams,
     UpdateStoplossParams,
+)
+from lnmarkets_sdk.rest.v3.models.perp import (
+    GetPerpTradesParams,
+    PerpCursor,
+    PerpMarketFilter,
+    PerpMarketKey,
+    PerpOpenTrade,
+    PerpOrder,
+    PerpRunningTrade,
+    PerpStoploss,
+    PerpTradeParams,
+    PerpUpdateStoplossParams,
 )
 
 TRADE_ID = "d0b9f9a0-4f6e-4a5a-8b7a-7f0f5f9a8a1e"
@@ -328,3 +341,210 @@ async def test_max_retries_zero_disables_retry(httpx_mock: HTTPXMock) -> None:
             await client.futures.cross.cancel_all()
 
     assert len(httpx_mock.get_requests()) == 1
+
+
+GOLD = {"instrument": "quanto_perp", "pair": "xau_usdt"}
+
+
+def _perp_running_trade_payload() -> dict[str, object]:
+    return {
+        **_running_trade_payload(),
+        **GOLD,
+        "entryNotionalUsd": 4_000,
+        "exitNotionalUsd": None,
+        "entryBtcPrice": 100_000,
+        "sumQuantoAdjustmentFees": 0,
+    }
+
+
+def _signature(method: str, path: str, data: str, timestamp: str) -> str:
+    payload = f"{timestamp}{method}{path}{data}"
+    return b64encode(
+        hmac.new(SECRET.encode(), payload.encode(), hashlib.sha256).digest()
+    ).decode()
+
+
+async def test_perp_new_trade_posts_market_key_and_stoploss(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(json=_perp_running_trade_payload())
+
+    async with LNMClient(_auth_config()) as client:
+        trade = await client.perp.isolated.new_trade(
+            PerpOrder(
+                **GOLD,
+                type="market",
+                side="buy",
+                margin=10_000,
+                leverage=10,
+                stoploss=PerpStoploss(mode="trailing", value=0.05),
+            )
+        )
+
+    assert isinstance(trade, PerpRunningTrade)
+    assert trade.pair == "xau_usdt"
+
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.method == "POST"
+    assert request.url.path == "/v3/perp/isolated/trade"
+    assert json.loads(request.read()) == {
+        **GOLD,
+        "leverage": 10,
+        "side": "buy",
+        "type": "market",
+        "margin": 10_000,
+        "stoploss": {"mode": "trailing", "value": 0.05},
+    }
+
+
+async def test_perp_open_trade_parses_as_open(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        json={
+            **_perp_running_trade_payload(),
+            "type": "limit",
+            "running": False,
+            "open": True,
+            "filledAt": None,
+        }
+    )
+
+    async with LNMClient(_auth_config()) as client:
+        trade = await client.perp.isolated.new_trade(
+            PerpOrder(
+                **GOLD, type="limit", side="buy", price=2_000, quantity=1, leverage=10
+            )
+        )
+
+    assert isinstance(trade, PerpOpenTrade)
+
+
+async def test_perp_closed_trades_flatten_cursor_in_signed_query(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(json={"data": [], "nextCursor": None})
+    cursor = PerpCursor(value="2026-01-01T00:00:00.000Z", id=TRADE_ID)
+
+    async with LNMClient(_auth_config()) as client:
+        await client.perp.isolated.get_closed_trades(
+            GetPerpTradesParams(**GOLD, limit=10, cursor=cursor)
+        )
+
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.url.path == "/v3/perp/isolated/trades/closed"
+    assert request.url.params["cursor[value]"] == "2026-01-01T00:00:00.000Z"
+    assert request.url.params["cursor[id]"] == TRADE_ID
+    assert request.url.params["instrument"] == "quanto_perp"
+    assert "cursor" not in request.url.params
+
+    # The server signs over `url.search`, so the signature must match the query sent.
+    query = f"?{request.url.query.decode()}"
+    timestamp = request.headers["lnm-access-timestamp"]
+    expected = _signature("get", "/v3/perp/isolated/trades/closed", query, timestamp)
+    assert request.headers["lnm-access-signature"] == expected
+
+
+async def test_perp_closed_trades_parse_next_cursor(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        json={
+            "data": [],
+            "nextCursor": {"value": "2026-01-01T00:00:00.000Z", "id": TRADE_ID},
+        }
+    )
+
+    async with LNMClient(_auth_config()) as client:
+        page = await client.perp.isolated.get_closed_trades()
+
+    assert page.next_cursor == PerpCursor(value="2026-01-01T00:00:00.000Z", id=TRADE_ID)
+
+
+async def test_perp_remove_stoploss_sends_market_key_in_query(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(json=_perp_running_trade_payload())
+
+    async with LNMClient(_auth_config()) as client:
+        await client.perp.isolated.remove_stoploss(PerpTradeParams(id=TRADE_ID, **GOLD))
+
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.method == "DELETE"
+    assert request.url.path == "/v3/perp/isolated/trade/stoploss"
+    assert dict(request.url.params) == {"id": TRADE_ID, **GOLD}
+    assert request.read() == b""
+
+
+async def test_perp_get_ticker_is_public_without_credentials(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(
+        json={
+            **GOLD,
+            "time": "2026-01-01T00:00:00.000Z",
+            "mark": 2_000,
+            "lastPrice": 2_001,
+            "volume24h": 1_000_000,
+            "prices": [],
+            "fundingRate": 0.0001,
+            "fundingTime": "2026-01-01T08:00:00.000Z",
+            "quantoAdjustmentRate": 0.00005,
+            "exchangesWeights": {"binance": 1},
+        }
+    )
+
+    async with LNMClient(APIClientConfig(network="signet")) as client:
+        ticker = await client.perp.get_ticker(PerpMarketKey(**GOLD))
+
+    assert ticker.mark == 2_000
+    assert ticker.quanto_adjustment_rate == 0.00005
+    assert ticker.volume_24h == 1_000_000
+
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert dict(request.url.params) == GOLD
+    assert "lnm-access-key" not in request.headers
+
+
+async def test_perp_public_routes_sign_when_credentials_are_set(
+    httpx_mock: HTTPXMock,
+) -> None:
+    # Early-access markets are only served to an API key that can access them.
+    httpx_mock.add_response(json=[])
+
+    async with LNMClient(_auth_config()) as client:
+        markets = await client.get_markets()
+
+    assert markets == []
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.url.path == "/v3/markets"
+    assert request.headers["lnm-access-key"] == "test-key"
+
+
+def test_perp_market_filter_needs_both_keys() -> None:
+    with pytest.raises(ValidationError):
+        PerpMarketFilter(instrument="quanto_perp")
+    with pytest.raises(ValidationError):
+        GetPerpTradesParams(pair="xau_usdt")
+    assert prepare_params(PerpMarketFilter()) == {}
+
+
+async def test_futures_methods_warn_deprecated(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(json=[])
+
+    async with LNMClient(_auth_config()) as client:
+        with pytest.warns(
+            DeprecationWarning, match=r"client\.perp\.isolated\.get_running_trades\(\)"
+        ):
+            await client.futures.isolated.get_running_trades()
+
+
+def test_nested_whole_floats_serialize_as_ints() -> None:
+    # The server signs `JSON.stringify(body)`, which writes 64000.0 as 64000.
+    params = PerpUpdateStoplossParams(
+        id=TRADE_ID, **GOLD, stoploss=PerpStoploss(value=64_000)
+    )
+    body = prepare_params(params)
+    assert body is not None
+    assert json.dumps(body["stoploss"]) == '{"mode": "fixed", "value": 64000}'

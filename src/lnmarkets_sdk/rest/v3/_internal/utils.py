@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import warnings
 from base64 import b64encode
 from collections.abc import Mapping
 from datetime import datetime
@@ -24,8 +25,11 @@ from .models import (
 
 
 def _float_to_int(value: object) -> object:
+    # The server signs `JSON.stringify(body)`, which writes 64000.0 as 64000.
     if isinstance(value, float) and value.is_integer():
         return int(value)
+    if isinstance(value, dict):
+        return {key: _float_to_int(item) for key, item in value.items()}  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
     return value
 
 
@@ -40,6 +44,32 @@ def prepare_params(
         params_dict = params.model_dump(mode="json", exclude_none=True, by_alias=True)
         return {key: _float_to_int(value) for key, value in params_dict.items()}
     return dict(params)
+
+
+def flatten_query(params: Mapping[str, Any]) -> dict[str, Any]:
+    """Flatten nested objects into bracket keys for a query string.
+
+    The API reads `{"cursor": {"value": v, "id": i}}` from the query as
+    `cursor[value]=v&cursor[id]=i`.
+    """
+    flat: dict[str, Any] = {}
+    for key, value in params.items():
+        if isinstance(value, Mapping):
+            for sub_key, sub_value in value.items():  # pyright: ignore[reportUnknownVariableType]
+                flat[f"{key}[{sub_key}]"] = sub_value
+        else:
+            flat[key] = value
+    return flat
+
+
+def warn_deprecated(old: str, new: str) -> None:
+    """Warn that a `/v3/futures` method has a `/v3/perp` replacement."""
+    warnings.warn(
+        f"{old} is deprecated, use {new} with "
+        "instrument='inverse_perp', pair='btc_usd' instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def _create_signature(
@@ -70,9 +100,7 @@ def create_auth_headers(
 
 def get_hostname(network: APINetwork) -> str:
     """Get API hostname based on network."""
-    return (
-        "api.signet.lnmarkets.com" if network == "signet" else "api.lnmarkets.com"
-    )
+    return "api.signet.lnmarkets.com" if network == "signet" else "api.lnmarkets.com"
 
 
 def parse_response[T](

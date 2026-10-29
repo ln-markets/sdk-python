@@ -27,24 +27,39 @@ from lnmarkets_sdk.rest.v3.models.account import (
     GetNotificationsParams,
 )
 from lnmarkets_sdk.rest.v3.models.futures_cross import FuturesCrossOrderLimit
-from lnmarkets_sdk.rest.v3.models.futures_data import (
-    GetCandlesParams,
-    GetFundingSettlementsParams,
-)
-from lnmarkets_sdk.rest.v3.models.futures_isolated import (
-    CloseTradeParams,
-    FuturesOrder,
-    GetClosedTradesParams,
-    GetIsolatedFundingFeesParams,
-    RemoveStoplossParams,
-    RemoveTakeprofitParams,
-    UpdateStoplossParams,
-    UpdateTakeprofitParams,
+from lnmarkets_sdk.rest.v3.models.perp import (
+    GetPerpCandlesParams,
+    GetPerpFundingFeesParams,
+    GetPerpFundingSettlementsParams,
+    GetPerpTradesParams,
+    PerpMarketFilter,
+    PerpMarketKey,
+    PerpOrder,
+    PerpStoploss,
+    PerpTradeParams,
+    PerpUpdateStoplossParams,
+    PerpUpdateTakeprofitParams,
 )
 
 Network = Literal["mainnet", "signet"]
 
 load_dotenv()
+
+BTC_USD = PerpMarketKey(instrument="inverse_perp", pair="btc_usd")
+
+
+async def pick_market(client: LNMClient) -> PerpMarketKey:
+    """Pick a perp market other than BTC/USD (e.g. qGOLD), else BTC/USD.
+
+    Which markets you can trade depends on the network and on your API key.
+    """
+    for market in await client.get_markets():
+        if market.instrument in ("inverse_perp", "quanto_perp") and (
+            market.instrument,
+            market.pair,
+        ) != (BTC_USD.instrument, BTC_USD.pair):
+            return PerpMarketKey(instrument=market.instrument, pair=market.pair)
+    return BTC_USD
 
 
 async def example_public_endpoints(network: Network):
@@ -59,9 +74,18 @@ async def example_public_endpoints(network: Network):
         # All these requests share the same connection pool
         print("\n🔄 Making multiple requests with connection reuse...")
 
-        # Get futures ticker
-        ticker = await client.futures.get_ticker()
-        print("\n--- Futures Ticker ---")
+        # List the markets
+        markets = await client.get_markets()
+        print("\n--- Markets ---")
+        for market in markets:
+            print(f"  {market.id} ({market.display_name}): {market.status}")
+
+        # Get a perp ticker
+        await asyncio.sleep(1)
+        market = await pick_market(client)
+        await asyncio.sleep(1)
+        ticker = await client.perp.get_ticker(market)
+        print(f"\n--- Perp Ticker ({market.instrument}:{market.pair}) ---")
         pprint(ticker.model_dump(), indent=2, width=100)
 
         # Get leaderboard
@@ -88,29 +112,35 @@ async def example_public_endpoints(network: Network):
         print("\n--- Server Time ---")
         print(f"Response: {time_response}")
 
-        # Get futures candles
+        # Get perp candles, two pages
         await asyncio.sleep(1)
-        candles_params = GetCandlesParams(
-            from_="2024-01-01T00:00:00.000Z",
-            range="1h",
-            limit=5,
+        candles_params = GetPerpCandlesParams(
+            **market.model_dump(), range="1h", limit=3
         )
-        candles = await client.futures.get_candles(candles_params)
-        print("\n--- Futures Candles (Last 5) ---")
-        for candle in candles.data[:3]:  # Show first 3
+        candles = await client.perp.get_candles(candles_params)
+        print("\n--- Perp Candles (Last 3) ---")
+        for candle in candles.data:
             print(
                 f"Time: {candle.time}, OHLC: {candle.open}/{candle.high}/{candle.low}/{candle.close}"
             )
+        if candles.next_cursor:
+            # Pass `next_cursor` back as `cursor` to get the next page.
+            await asyncio.sleep(1)
+            candles_params.cursor = candles.next_cursor
+            older = await client.perp.get_candles(candles_params)
+            print(f"Next page starts at: {older.data[0].time if older.data else None}")
 
         # Get funding settlements
         await asyncio.sleep(1)
-        funding_settlements = await client.futures.get_funding_settlements(
-            GetFundingSettlementsParams(limit=5)
+        funding_settlements = await client.perp.get_funding_settlements(
+            GetPerpFundingSettlementsParams(**market.model_dump(), limit=5)
         )
         print("\n--- Funding Settlements (Last 5) ---")
         for settlement in funding_settlements.data[:3]:  # Show first 3
             print(
-                f"Rate: {settlement.funding_rate}, Price: {settlement.fixing_price}, Time: {settlement.time}"
+                f"Rate: {settlement.funding_rate}, "
+                f"Quanto adjustment: {settlement.quanto_adjustment_rate}, "
+                f"Price: {settlement.fixing_price}, Time: {settlement.time}"
             )
 
 
@@ -185,43 +215,50 @@ async def example_authenticated_endpoints(network: Network):
         await client.account.read_notifications()
         print("\n--- read_notifications() called ---")
 
-        # Get running trades
+        # Running trades of every perp market
         await asyncio.sleep(1)
-        running_trades = await client.futures.isolated.get_running_trades()
-        print("\n--- Running Isolated Trades ---")
+        running_trades = await client.perp.isolated.get_running_trades()
+        print("\n--- Running Isolated Trades (all markets) ---")
         print(f"Count: {len(running_trades)}")
         for trade in running_trades[:3]:  # Show first 3
             side = "LONG" if trade.side == "buy" else "SHORT"
             print(
-                f"  {side} - Margin: {trade.margin} sats, Leverage: {trade.leverage}x, PL: {trade.pl} sats"
+                f"  {trade.instrument}:{trade.pair} {side} - Margin: {trade.margin} sats, "
+                f"Leverage: {trade.leverage}x, PL: {trade.pl} sats"
             )
 
-        # Get open trades
+        # Open trades of one market
         await asyncio.sleep(1)
-        open_trades = await client.futures.isolated.get_open_trades()
-        print(f"\n--- Open Isolated Trades (Count: {len(open_trades)}) ---")
+        market = await pick_market(client)
+        open_trades = await client.perp.isolated.get_open_trades(
+            PerpMarketFilter(**market.model_dump())
+        )
+        print(f"\n--- Open Isolated Trades on {market.pair} ---")
         for trade in open_trades[:3]:  # Show first 3
             side = "LONG" if trade.side == "buy" else "SHORT"
             print(f"  {side} - Price: {trade.price}, Quantity: {trade.quantity}")
 
-        # Get closed trades
+        # Closed trades
         await asyncio.sleep(1)
-        closed_trades = await client.futures.isolated.get_closed_trades(
-            GetClosedTradesParams(limit=5)
+        closed_trades = await client.perp.isolated.get_closed_trades(
+            GetPerpTradesParams(limit=5)
         )
         print(f"\n--- Closed Isolated Trades (Last {len(closed_trades.data)}) ---")
         for trade in closed_trades.data[:3]:  # Show first 3
             side = "LONG" if trade.side == "buy" else "SHORT"
-            print(f"  {side} - PL: {trade.pl} sats, Closed: {trade.closed}")
+            print(f"  {trade.pair} {side} - PL: {trade.pl} sats")
 
-        # Get isolated funding fees
+        # Isolated funding fees
         await asyncio.sleep(1)
-        isolated_fees = await client.futures.isolated.get_funding_fees(
-            GetIsolatedFundingFeesParams(limit=5)
+        isolated_fees = await client.perp.isolated.get_funding_fees(
+            GetPerpFundingFeesParams(limit=5)
         )
         print(f"\n--- Isolated Funding Fees (Last {len(isolated_fees.data)}) ---")
         for fee in isolated_fees.data[:3]:  # Show first 3
-            print(f"Fee: {fee.fee} sats, Time: {fee.time}")
+            print(
+                f"{fee.pair} Fee: {fee.fee} sats, "
+                f"Quanto: {fee.quanto_adjustment_fee} sats, Time: {fee.time}"
+            )
 
         # Get cross margin position
         try:
@@ -249,87 +286,62 @@ async def example_authenticated_endpoints(network: Network):
         except Exception as e:
             print(f"Error: {e}")
 
-        print("\n --- Open isolated market trade then update take profit ---")
+        print(f"\n --- Trade on {market.instrument}:{market.pair} ---")
         try:
-            new_trade_params = FuturesOrder(
-                type="market",
-                side="buy",
-                quantity=1,
-                leverage=10,
-                takeprofit=150_000,
-            )
-            opened = await client.futures.isolated.new_trade(new_trade_params)
-            print(f"Opened trade ID: {opened.id}, takeprofit: {opened.takeprofit}")
-
-            await asyncio.sleep(1)
-            tp_params = UpdateTakeprofitParams(id=opened.id, value=200_000)
-            updated = await client.futures.isolated.update_takeprofit(tp_params)
-            print(f"New take profit: {updated.takeprofit}")
-
-            await asyncio.sleep(1)
-            closed = await client.futures.isolated.close(CloseTradeParams(id=opened.id))
-            print(f"Closed trade {closed.id} - PL: {closed.pl} sats")
-        except Exception as e:
-            print(f"Error: {e}")
-
-        print("\n --- Set a trailing stop, then remove stop loss and take profit ---")
-        try:
-            # Fetch the current price so the stop/take-profit levels are valid
-            # whatever BTC is trading at. Prices must be a multiple of 0.5.
-            ticker = await client.futures.get_ticker()
-            price = ticker.last_price
-            # Long trade: stop just below entry (above liquidation), take profit
-            # above entry. Prices must be a multiple of 0.5.
-            stoploss = round(price * 0.98 * 2) / 2
-            takeprofit = round(price * 1.5 * 2) / 2
-            print(
-                f"BTC price: {price} -> stoploss: {stoploss}, takeprofit: {takeprofit}"
-            )
-
-            await asyncio.sleep(1)
-            opened = await client.futures.isolated.new_trade(
-                FuturesOrder(
+            # Size the trade by margin: the quantity unit depends on the market
+            # (USD for BTC/USD, ounces for qGOLD, ...).
+            opened = await client.perp.isolated.new_trade(
+                PerpOrder(
+                    **market.model_dump(),
                     type="market",
                     side="buy",
-                    quantity=1,
+                    margin=10_000,
                     leverage=10,
-                    stoploss=stoploss,
-                    takeprofit=takeprofit,
                 )
             )
-            print(
-                f"Opened trade ID: {opened.id}, "
-                f"stoploss: {opened.stoploss}, takeprofit: {opened.takeprofit}"
-            )
+            print(f"Opened trade ID: {opened.id}, quantity: {opened.quantity}")
+            trade = PerpTradeParams(id=opened.id, **market.model_dump())
 
-            # Switch to a trailing stop: `value` is a fraction of price, not an
-            # absolute price. The upper bound is capped by liquidation (~1/leverage),
-            # so keep it comfortably under that for a 10x position.
+            # Take profit above entry, stop loss between liquidation and entry.
             await asyncio.sleep(1)
-            trailing = await client.futures.isolated.update_stoploss(
-                UpdateStoplossParams(id=opened.id, value=0.05, mode="trailing")
+            updated = await client.perp.isolated.update_takeprofit(
+                PerpUpdateTakeprofitParams(
+                    **trade.model_dump(), value=round(opened.price * 1.5)
+                )
+            )
+            print(f"Take profit: {updated.takeprofit}")
+
+            await asyncio.sleep(1)
+            updated = await client.perp.isolated.update_stoploss(
+                PerpUpdateStoplossParams(
+                    **trade.model_dump(),
+                    stoploss=PerpStoploss(
+                        mode="fixed",
+                        value=round((opened.price + opened.liquidation) / 2),
+                    ),
+                )
+            )
+            print(f"Stop loss: {updated.stoploss}")
+
+            # Switch to a trailing stop: `value` is a fraction of price, not a
+            # price. It is capped by liquidation (~1/leverage).
+            await asyncio.sleep(1)
+            trailing = await client.perp.isolated.update_stoploss(
+                PerpUpdateStoplossParams(
+                    **trade.model_dump(),
+                    stoploss=PerpStoploss(mode="trailing", value=0.05),
+                )
             )
             print(f"Trailing distance: {trailing.stoploss_trailing_distance}")
 
-            # Remove the stop loss (clears both fixed stop and trailing distance).
+            # Remove the stop loss (fixed and trailing) and the take profit.
             await asyncio.sleep(1)
-            no_sl = await client.futures.isolated.remove_stoploss(
-                RemoveStoplossParams(id=opened.id)
-            )
-            print(
-                f"After remove_stoploss -> stoploss: {no_sl.stoploss}, "
-                f"trailing: {no_sl.stoploss_trailing_distance}"
-            )
-
-            # Remove the take profit.
+            await client.perp.isolated.remove_stoploss(trade)
             await asyncio.sleep(1)
-            no_tp = await client.futures.isolated.remove_takeprofit(
-                RemoveTakeprofitParams(id=opened.id)
-            )
-            print(f"After remove_takeprofit -> takeprofit: {no_tp.takeprofit}")
+            await client.perp.isolated.remove_takeprofit(trade)
 
             await asyncio.sleep(1)
-            closed = await client.futures.isolated.close(CloseTradeParams(id=opened.id))
+            closed = await client.perp.isolated.close(trade)
             print(f"Closed trade {closed.id} - PL: {closed.pl} sats")
         except Exception as e:
             print(f"Error: {e}")
