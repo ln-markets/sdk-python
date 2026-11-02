@@ -10,7 +10,7 @@ Run:
 
 Authenticated run reads creds by network:
     mainnet  -> MAINNET_API_KEY, MAINNET_API_SECRET, MAINNET_API_PASSPHRASE
-    signet -> SIGNET_API_KEY, SIGNET_API_SECRET, SIGNET_API_PASSPHRASE
+    signet   -> SIGNET_API_KEY, SIGNET_API_SECRET, SIGNET_API_PASSPHRASE
 """
 
 import asyncio
@@ -133,10 +133,10 @@ async def example_public_endpoints(network: Network):
         # Get funding settlements
         await asyncio.sleep(1)
         funding_settlements = await client.perp.get_funding_settlements(
-            GetPerpFundingSettlementsParams(**market.model_dump(), limit=5)
+            GetPerpFundingSettlementsParams(**market.model_dump(), limit=3)
         )
-        print("\n--- Funding Settlements (Last 5) ---")
-        for settlement in funding_settlements.data[:3]:  # Show first 3
+        print("\n--- Funding Settlements (Last 3) ---")
+        for settlement in funding_settlements.data:
             print(
                 f"Rate: {settlement.funding_rate}, "
                 f"Quanto adjustment: {settlement.quanto_adjustment_rate}, "
@@ -152,14 +152,14 @@ async def example_authenticated_endpoints(network: Network):
 
     prefix = network.upper()
     key = os.getenv(f"{prefix}_API_KEY")
-    secret = os.getenv(f"{prefix}_API_KEY_SECRET")
-    passphrase = os.getenv(f"{prefix}_API_KEY_PASSPHRASE")
+    secret = os.getenv(f"{prefix}_API_SECRET")
+    passphrase = os.getenv(f"{prefix}_API_PASSPHRASE")
 
     if not (key and secret and passphrase):
         print("\n⚠️  Skipping authenticated example:")
         print(
-            f"    Please set {prefix}_API_KEY, {prefix}_API_KEY_SECRET, "
-            f"and {prefix}_API_KEY_PASSPHRASE"
+            f"    Please set {prefix}_API_KEY, {prefix}_API_SECRET, "
+            f"and {prefix}_API_PASSPHRASE"
         )
         return
 
@@ -189,7 +189,7 @@ async def example_authenticated_endpoints(network: Network):
         print("\n--- Bitcoin Deposit Address ---")
         print(f"Address: {btc_address.address}")
 
-        # Get lightning deposits (last 5)
+        # Get lightning deposits (up to 5)
         deposits_response = await client.account.get_lightning_deposits(
             GetLightningDepositsParams(from_="1970-01-01T00:00:00.000Z", limit=5)
         )
@@ -202,7 +202,7 @@ async def example_authenticated_endpoints(network: Network):
         # List current notifications. Notifications fire server-side on async
         # events (deposit settled, withdrawal processed, trade closed by SL/TP,
         # funding settlements, system announcements) — not synchronously from
-        # the client. List may be empty on a fresh testnet account.
+        # the client. List may be empty on a fresh signet account.
         await asyncio.sleep(1)
         notifs = await client.account.get_notifications(GetNotificationsParams(limit=5))
         unread = sum(1 for n in notifs.data if not n.read)
@@ -218,9 +218,9 @@ async def example_authenticated_endpoints(network: Network):
         # Running trades of every perp market
         await asyncio.sleep(1)
         running_trades = await client.perp.isolated.get_running_trades()
-        print("\n--- Running Isolated Trades (all markets) ---")
+        print("\n--- Running Isolated Trades (all markets, first 3) ---")
         print(f"Count: {len(running_trades)}")
-        for trade in running_trades[:3]:  # Show first 3
+        for trade in running_trades[:3]:
             side = "LONG" if trade.side == "buy" else "SHORT"
             print(
                 f"  {trade.instrument}:{trade.pair} {side} - Margin: {trade.margin} sats, "
@@ -233,28 +233,31 @@ async def example_authenticated_endpoints(network: Network):
         open_trades = await client.perp.isolated.get_open_trades(
             PerpMarketFilter(**market.model_dump())
         )
-        print(f"\n--- Open Isolated Trades on {market.pair} ---")
-        for trade in open_trades[:3]:  # Show first 3
+        print(
+            f"\n--- Open Isolated Trades on {market.instrument}:{market.pair} "
+            f"(first 3 of {len(open_trades)}) ---"
+        )
+        for trade in open_trades[:3]:
             side = "LONG" if trade.side == "buy" else "SHORT"
             print(f"  {side} - Price: {trade.price}, Quantity: {trade.quantity}")
 
         # Closed trades
         await asyncio.sleep(1)
         closed_trades = await client.perp.isolated.get_closed_trades(
-            GetPerpTradesParams(limit=5)
+            GetPerpTradesParams(limit=3)
         )
         print(f"\n--- Closed Isolated Trades (Last {len(closed_trades.data)}) ---")
-        for trade in closed_trades.data[:3]:  # Show first 3
+        for trade in closed_trades.data:
             side = "LONG" if trade.side == "buy" else "SHORT"
             print(f"  {trade.pair} {side} - PL: {trade.pl} sats")
 
         # Isolated funding fees
         await asyncio.sleep(1)
         isolated_fees = await client.perp.isolated.get_funding_fees(
-            GetPerpFundingFeesParams(limit=5)
+            GetPerpFundingFeesParams(limit=3)
         )
         print(f"\n--- Isolated Funding Fees (Last {len(isolated_fees.data)}) ---")
-        for fee in isolated_fees.data[:3]:  # Show first 3
+        for fee in isolated_fees.data:
             print(
                 f"{fee.pair} Fee: {fee.fee} sats, "
                 f"Quanto: {fee.quanto_adjustment_fee} sats, Time: {fee.time}"
@@ -286,7 +289,7 @@ async def example_authenticated_endpoints(network: Network):
         except Exception as e:
             print(f"Error: {e}")
 
-        print(f"\n --- Trade on {market.instrument}:{market.pair} ---")
+        print(f"\n--- Trade on {market.instrument}:{market.pair} ---")
         try:
             # Size the trade by margin: the quantity unit depends on the market
             # (USD for BTC/USD, ounces for qGOLD, ...).

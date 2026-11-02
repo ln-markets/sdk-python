@@ -24,7 +24,7 @@ async with LNMClient() as client:
   )
 ```
 
-Remember to sleep between requests, as the rate limit is 1 requests per second for public endpoints.
+Remember to sleep between requests, as the rate limit is 1 request per second for public endpoints.
 
 For endpoints that need authentication, you need to create an instance of the `LNMClient` class and provide your API credentials:
 
