@@ -4,7 +4,9 @@ if TYPE_CHECKING:
     from lnmarkets_sdk.rest.v3.http.client import LNMClient
 
 from lnmarkets_sdk.rest.v3.models.perp import (
+    PERP_TRADE_ADAPTER,
     GetPerpFundingFeesParams,
+    GetPerpTradeParams,
     GetPerpTradesParams,
     PerpAddMarginParams,
     PerpCanceledTrade,
@@ -18,6 +20,7 @@ from lnmarkets_sdk.rest.v3.models.perp import (
     PerpPaginatedResponse,
     PerpRunningTrade,
     PerpRunningTradeRead,
+    PerpTrade,
     PerpTradeParams,
     PerpUpdateStoplossParams,
     PerpUpdateTakeprofitParams,
@@ -58,6 +61,33 @@ class PerpIsolatedClient:
             params=params,
             credentials=True,
             response_model=PerpOpenTrade | PerpRunningTrade,
+        )
+
+    async def get_trade(self, params: GetPerpTradeParams) -> PerpTrade:
+        """
+        Get one of your trades, in any state and of any perp market, by its `id`
+        or its `client_id` (pass exactly one).
+
+        After a timeout, resend the order with the same `client_id`: a 409
+        `CONFLICT` means the first one went through, and this fetches it.
+
+        Example:
+        ```python
+        from lnmarkets_sdk.rest.v3.models.perp import GetPerpTradeParams
+
+        async with LNMClient(config) as client:
+            trade = await client.perp.isolated.get_trade(
+                GetPerpTradeParams(client_id="my-order-0001")
+            )
+            print(f"{trade.instrument}:{trade.pair} running={trade.running}")
+        ```
+        """
+        return await self._client.request(
+            "GET",
+            "/perp/isolated/trade",
+            params=params,
+            credentials=True,
+            response_model=PERP_TRADE_ADAPTER,
         )
 
     async def cancel(self, params: PerpTradeParams):

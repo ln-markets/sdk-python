@@ -110,7 +110,7 @@ async with LNMClient(config) as client:
         page = await client.perp.isolated.get_closed_trades(params)
 ```
 
-The `client.futures` methods that have a `client.perp` replacement (ticker, candles, funding settlements and all isolated methods) are deprecated and raise a `DeprecationWarning`. They still work and trade BTC/USD only. To move, call the `client.perp` method with the same name and `instrument="inverse_perp", pair="btc_usd"`. Note that `PerpOrder.stoploss` is an object (`PerpStoploss(mode=..., value=...)`), not a number plus `stoploss_mode`.
+The `client.futures` methods that have a `client.perp` replacement (ticker, candles, funding settlements and all isolated methods) are deprecated and raise a `DeprecationWarning`. They still work and trade BTC/USD only. To move, call the `client.perp` method with the same name and `instrument="inverse_perp", pair="btc_usd"`. Note that `PerpOrder.stoploss` is an object (`PerpStoploss(mode=..., value=...)`), not a number plus `stoploss_mode`. On `client.perp`, `client_id` is a unique client order ID (reusing one fails with HTTP 409 `CONFLICT`): put tags that several trades share in `label`, and fetch a trade by either key with `client.perp.isolated.get_trade()`.
 
 Check our [REST example](./examples/rest_v3.py) for more details.
 
@@ -145,6 +145,7 @@ client.perp.get_funding_settlements()
 
 # Perp Isolated 🔒
 client.perp.isolated.new_trade()
+client.perp.isolated.get_trade()
 client.perp.isolated.get_running_trades()
 client.perp.isolated.get_open_trades()
 client.perp.isolated.get_closed_trades()

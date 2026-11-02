@@ -30,13 +30,17 @@ from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     UpdateStoplossParams,
 )
 from lnmarkets_sdk.rest.v3.models.perp import (
+    GetPerpTradeParams,
     GetPerpTradesParams,
+    PerpCanceledTrade,
+    PerpClosedTrade,
     PerpCursor,
     PerpMarketFilter,
     PerpMarketKey,
     PerpOpenTrade,
     PerpOrder,
     PerpRunningTrade,
+    PerpRunningTradeRead,
     PerpStoploss,
     PerpTradeParams,
     PerpUpdateStoplossParams,
@@ -417,6 +421,105 @@ async def test_perp_open_trade_parses_as_open(httpx_mock: HTTPXMock) -> None:
         )
 
     assert isinstance(trade, PerpOpenTrade)
+
+
+async def test_perp_new_trade_sends_client_id_and_label(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        json={**_perp_running_trade_payload(), "clientId": "order-1", "label": "grid"}
+    )
+
+    async with LNMClient(_auth_config()) as client:
+        trade = await client.perp.isolated.new_trade(
+            PerpOrder(
+                **GOLD,
+                type="market",
+                side="buy",
+                quantity=1,
+                leverage=10,
+                client_id="order-1",
+                label="grid",
+            )
+        )
+
+    assert (trade.client_id, trade.label) == ("order-1", "grid")
+    request = httpx_mock.get_request()
+    assert request is not None
+    body = json.loads(request.read())
+    assert (body["clientId"], body["label"]) == ("order-1", "grid")
+
+
+def test_perp_order_rejects_empty_label() -> None:
+    with pytest.raises(ValidationError):
+        PerpOrder(**GOLD, type="market", side="buy", quantity=1, leverage=10, label="")
+
+
+async def test_perp_get_trade_by_client_id_signs_query(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(json=_perp_running_trade_payload())
+
+    async with LNMClient(_auth_config()) as client:
+        trade = await client.perp.isolated.get_trade(
+            GetPerpTradeParams(client_id="order-1")
+        )
+
+    assert isinstance(trade, PerpRunningTradeRead)
+    request = httpx_mock.get_request()
+    assert request is not None
+    assert request.method == "GET"
+    assert request.url.path == "/v3/perp/isolated/trade"
+    assert request.url.query.decode() == "clientId=order-1"
+    timestamp = request.headers["lnm-access-timestamp"]
+    expected = _signature(
+        "get", "/v3/perp/isolated/trade", "?clientId=order-1", timestamp
+    )
+    assert request.headers["lnm-access-signature"] == expected
+
+
+@pytest.mark.parametrize(
+    ("flags", "expected"),
+    [
+        (
+            {"open": True, "running": False, "type": "limit", "filledAt": None},
+            PerpOpenTrade,
+        ),
+        ({}, PerpRunningTradeRead),
+        (
+            {
+                "running": False,
+                "closed": True,
+                "closedAt": "2026-01-02T00:00:00.000Z",
+                "exitPrice": 101_000,
+                "exitNotionalUsd": 4_040,
+            },
+            PerpClosedTrade,
+        ),
+        (
+            {
+                "running": False,
+                "canceled": True,
+                "type": "limit",
+                "filledAt": None,
+                "closedAt": "2026-01-02T00:00:00.000Z",
+            },
+            PerpCanceledTrade,
+        ),
+    ],
+)
+async def test_perp_get_trade_parses_each_state(
+    httpx_mock: HTTPXMock, flags: dict[str, object], expected: type
+) -> None:
+    httpx_mock.add_response(json={**_perp_running_trade_payload(), **flags})
+
+    async with LNMClient(_auth_config()) as client:
+        trade = await client.perp.isolated.get_trade(GetPerpTradeParams(id=TRADE_ID))
+
+    assert type(trade) is expected
+
+
+def test_get_perp_trade_params_needs_exactly_one_key() -> None:
+    with pytest.raises(ValidationError):
+        GetPerpTradeParams()
+    with pytest.raises(ValidationError):
+        GetPerpTradeParams(id=TRADE_ID, client_id="order-1")
 
 
 async def test_perp_closed_trades_flatten_cursor_in_signed_query(

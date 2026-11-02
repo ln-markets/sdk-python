@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from types import UnionType
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from lnmarkets_sdk.rest.v3._internal import BaseClient
 from lnmarkets_sdk.rest.v3._internal.models import (
@@ -113,7 +113,7 @@ class LNMClient:
         path: str,
         params: BaseModel | Mapping[str, object] | None = None,
         credentials: bool = False,
-        response_model: type[T] | UnionType | None = None,
+        response_model: type[T] | UnionType | TypeAdapter[T] | None = None,
     ) -> T:
         """
         Make an HTTP request to the API with automatic validation.

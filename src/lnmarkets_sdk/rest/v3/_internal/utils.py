@@ -94,7 +94,7 @@ def get_hostname(network: APINetwork) -> str:
 
 def parse_response[T](
     response: httpx.Response,
-    model: type[T] | UnionType | None = None,
+    model: type[T] | UnionType | TypeAdapter[T] | None = None,
 ) -> T:
     """Parse and validate API response."""
     if not response.is_success:
@@ -121,7 +121,9 @@ def parse_response[T](
         return data
 
     try:
-        adapter: TypeAdapter[T] = TypeAdapter(model)
+        adapter: TypeAdapter[T] = (
+            model if isinstance(model, TypeAdapter) else TypeAdapter(model)
+        )
         return adapter.validate_python(data)
     except ValidationError as e:
         raise APIValidationException(

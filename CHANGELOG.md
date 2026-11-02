@@ -13,8 +13,10 @@ Multi-market perp API (`/v3/perp`) and `GET /v3/markets`.
 
 - `client.get_markets()` (`GET /v3/markets`): the released markets, plus the early-access markets your API key can access. Returns `Market` models (`lnmarkets_sdk.rest.v3.models.markets`).
 - `client.perp` (`PerpClient`) for `/v3/perp`: `get_ticker()`, `get_candles()` and `get_funding_settlements()`.
-- `client.perp.isolated` (`PerpIsolatedClient`) for `/v3/perp/isolated`: `new_trade()`, `cancel()`, `cancel_all()`, `close()`, `add_margin()`, `cash_in()`, `update_stoploss()`, `update_takeprofit()`, `remove_stoploss()`, `remove_takeprofit()`, `get_open_trades()`, `get_running_trades()`, `get_closed_trades()`, `get_canceled_trades()` and `get_funding_fees()`.
+- `client.perp.isolated` (`PerpIsolatedClient`) for `/v3/perp/isolated`: `new_trade()`, `get_trade()`, `cancel()`, `cancel_all()`, `close()`, `add_margin()`, `cash_in()`, `update_stoploss()`, `update_takeprofit()`, `remove_stoploss()`, `remove_takeprofit()`, `get_open_trades()`, `get_running_trades()`, `get_closed_trades()`, `get_canceled_trades()` and `get_funding_fees()`.
 - Perp models in `lnmarkets_sdk.rest.v3.models.perp`. Every perp call takes the market key (`instrument` + `pair`). Trades, tickers, funding settlements and funding fees include the quanto fields (`quanto_adjustment_rate`, `quanto_adjustment_fee`, `sum_quanto_adjustment_fees`), the notional fields, and the `mark` price.
+- `client.perp.isolated.get_trade()` (`GET /v3/perp/isolated/trade`): one trade in any state and of any market, by `id` or by `client_id` (`GetPerpTradeParams`). Returns the variant that matches the trade state.
+- `label` on `PerpOrder` and on perp trades: a free tag several trades can share. On `/perp`, `client_id` is a unique client order ID: reusing one fails with HTTP 409 `CONFLICT`, and older trades' tags now show as `label`.
 - Cursor pagination for the perp history reads: pass `next_cursor` back as `cursor`. The cursor is an object (`PerpCursor(value=..., id=...)`), sent as `cursor[value]` and `cursor[id]` in the query.
 - The public perp routes and `get_markets()` sign the request when the client has credentials, so early-access markets work.
 

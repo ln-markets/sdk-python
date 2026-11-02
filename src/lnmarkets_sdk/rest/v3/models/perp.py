@@ -2,9 +2,17 @@
 # in concrete trade variants (see futures_isolated.py).
 # pyright: reportIncompatibleVariableOverride=false
 
-from typing import Literal
+from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, Field, SkipValidation, model_validator
+from pydantic import (
+    BaseModel,
+    Discriminator,
+    Field,
+    SkipValidation,
+    Tag,
+    TypeAdapter,
+    model_validator,
+)
 
 from lnmarkets_sdk.rest.v3._internal.models import UUID, BaseConfig
 from lnmarkets_sdk.rest.v3.models.futures_data import (
@@ -220,7 +228,17 @@ class PerpOrder(PerpMarketKey):
     client_id: str | None = Field(
         default=None,
         max_length=64,
-        description="Optional custom data field (max 64 characters)",
+        description=(
+            "Your client order ID (max 64 characters). Unique across all your "
+            "isolated trades and markets: reusing one fails with HTTP 409 "
+            "CONFLICT and no trade is placed. Use `label` to tag several trades."
+        ),
+    )
+    label: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        description="Free tag that several trades can share, e.g. a strategy name",
     )
 
     @model_validator(mode="after")
@@ -251,6 +269,9 @@ class PerpTradeFields(BaseModel, BaseConfig):
     sum_quanto_adjustment_fees: SkipValidation[float] = Field(
         default=0.0, description="Total quanto adjustment fees paid"
     )
+    label: SkipValidation[str] | None = Field(
+        default=None, description="Free tag given when the trade was placed"
+    )
 
 
 class PerpOpenTrade(PerpTradeFields, FuturesOpenTrade): ...
@@ -270,6 +291,49 @@ class PerpClosedTrade(PerpTradeFields, FuturesClosedTrade):
 
 
 class PerpCanceledTrade(PerpTradeFields, FuturesCanceledTrade): ...
+
+
+def _trade_state(value: object) -> str:
+    flags = cast("dict[str, object]", value if isinstance(value, dict) else vars(value))
+    for state in ("canceled", "closed", "running"):
+        if flags.get(state):
+            return state
+    return "open"
+
+
+type PerpTrade = (
+    PerpOpenTrade | PerpRunningTradeRead | PerpClosedTrade | PerpCanceledTrade
+)
+"""A trade in any state, as `client.perp.isolated.get_trade()` returns it."""
+
+# The trade variants skip validation of their state flags, so a plain union
+# would always pick the first one: pick the variant by the flags instead.
+PERP_TRADE_ADAPTER: TypeAdapter[PerpTrade] = TypeAdapter(
+    Annotated[
+        Annotated[PerpOpenTrade, Tag("open")]
+        | Annotated[PerpRunningTradeRead, Tag("running")]
+        | Annotated[PerpClosedTrade, Tag("closed")]
+        | Annotated[PerpCanceledTrade, Tag("canceled")],
+        Discriminator(_trade_state),
+    ]
+)
+
+
+class GetPerpTradeParams(BaseModel, BaseConfig):
+    """Look up one trade, of any market, by `id` or by `client_id` (exactly one)."""
+
+    id: UUID | None = Field(default=None, description="Trade ID")
+    client_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Client ID given when the trade was placed",
+    )
+
+    @model_validator(mode="after")
+    def validate_schema(self):
+        if (self.id is None) == (self.client_id is None):
+            raise ValueError("Exactly one of id or client_id must be set")
+        return self
 
 
 class PerpTradeParams(PerpMarketKey):
