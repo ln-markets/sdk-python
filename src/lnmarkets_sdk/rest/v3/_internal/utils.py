@@ -3,7 +3,6 @@
 import hashlib
 import hmac
 import json
-import warnings
 from base64 import b64encode
 from collections.abc import Mapping
 from datetime import datetime
@@ -60,16 +59,6 @@ def flatten_query(params: Mapping[str, Any]) -> dict[str, Any]:
         else:
             flat[key] = value
     return flat
-
-
-def warn_deprecated(old: str, new: str) -> None:
-    """Warn that a `/v3/futures` method has a `/v3/perp` replacement."""
-    warnings.warn(
-        f"{old} is deprecated, use {new} with "
-        "instrument='inverse_perp', pair='btc_usd' instead.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
 
 
 def _create_signature(

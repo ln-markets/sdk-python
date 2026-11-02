@@ -540,6 +540,38 @@ async def test_futures_methods_warn_deprecated(httpx_mock: HTTPXMock) -> None:
             await client.futures.isolated.get_running_trades()
 
 
+def test_futures_methods_marked_deprecated_for_type_checkers() -> None:
+    # `@deprecated` sets `__deprecated__`, which IDEs and type checkers read
+    # to strike the call through and show the `client.perp` hint.
+    from lnmarkets_sdk.rest.v3.http.client.futures import FuturesClient
+    from lnmarkets_sdk.rest.v3.http.client.futures.cross import FuturesCrossClient
+    from lnmarkets_sdk.rest.v3.http.client.futures.isolated import (
+        FuturesIsolatedClient,
+    )
+    from lnmarkets_sdk.rest.v3.http.client.perp import PerpClient
+    from lnmarkets_sdk.rest.v3.http.client.perp.isolated import PerpIsolatedClient
+
+    replaced = {
+        FuturesClient: (
+            PerpClient,
+            ["get_ticker", "get_candles", "get_funding_settlements"],
+        ),
+        FuturesIsolatedClient: (
+            PerpIsolatedClient,
+            [n for n in vars(FuturesIsolatedClient) if not n.startswith("_")],
+        ),
+    }
+    for old_cls, (new_cls, names) in replaced.items():
+        for name in names:
+            message = getattr(old_cls, name).__deprecated__
+            assert hasattr(new_cls, name), name
+            assert f".{name}()" in message and "client.perp" in message, message
+
+    assert not hasattr(FuturesClient.get_leaderboard, "__deprecated__")
+    for name, member in vars(FuturesCrossClient).items():
+        assert not hasattr(member, "__deprecated__"), name
+
+
 def test_nested_whole_floats_serialize_as_ints() -> None:
     # The server signs `JSON.stringify(body)`, which writes 64000.0 as 64000.
     params = PerpUpdateStoplossParams(

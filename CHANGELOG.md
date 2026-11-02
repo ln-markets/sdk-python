@@ -20,7 +20,7 @@ Multi-market perp API (`/v3/perp`) and `GET /v3/markets`.
 
 ### Deprecated
 
-- `client.futures.get_ticker()`, `get_candles()`, `get_funding_settlements()` and every `client.futures.isolated` method. They still work and raise a `DeprecationWarning` that names the `client.perp` method to use with `instrument="inverse_perp", pair="btc_usd"`. `client.futures.get_leaderboard()` and `client.futures.cross` have no perp replacement yet and are not deprecated.
+- `client.futures.get_ticker()`, `get_candles()`, `get_funding_settlements()` and every `client.futures.isolated` method. They still work. They are marked with `@deprecated` (PEP 702), so IDEs and type checkers strike the call through and show the `client.perp` method to use, and at runtime they raise a `DeprecationWarning` with the same hint: call it with `instrument="inverse_perp", pair="btc_usd"`. `client.futures.get_leaderboard()` and `client.futures.cross` have no perp replacement yet and are not deprecated.
 
 ### Fixed
 

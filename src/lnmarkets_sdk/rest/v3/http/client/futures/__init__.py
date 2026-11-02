@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lnmarkets_sdk.rest.v3.http.client import LNMClient
 
+from typing_extensions import deprecated
+
 from lnmarkets_sdk.rest.v3._internal.models import PaginatedResponse
-from lnmarkets_sdk.rest.v3._internal.utils import warn_deprecated
 from lnmarkets_sdk.rest.v3.models.funding_fees import FundingSettlement
 from lnmarkets_sdk.rest.v3.models.futures_data import (
     Candle,
@@ -26,6 +27,9 @@ class FuturesClient:
         self.isolated = FuturesIsolatedClient(client)
         self.cross = FuturesCrossClient(client)
 
+    @deprecated(
+        "client.futures.get_ticker() is deprecated, use client.perp.get_ticker() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_ticker(self):
         """
         Get current futures ticker data.
@@ -42,7 +46,6 @@ class FuturesClient:
                 print(f"Best bid: {ticker.prices[0].bid_price}")
         ```
         """
-        warn_deprecated("client.futures.get_ticker()", "client.perp.get_ticker()")
         return await self._client.request(
             "GET",
             "/futures/ticker",
@@ -71,6 +74,9 @@ class FuturesClient:
             response_model=Leaderboard,
         )
 
+    @deprecated(
+        "client.futures.get_candles() is deprecated, use client.perp.get_candles() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_candles(self, params: GetCandlesParams):
         """
         Get OHLC candle data.
@@ -95,7 +101,6 @@ class FuturesClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
-        warn_deprecated("client.futures.get_candles()", "client.perp.get_candles()")
         return await self._client.request(
             "GET",
             "/futures/candles",
@@ -104,6 +109,9 @@ class FuturesClient:
             response_model=PaginatedResponse[Candle],
         )
 
+    @deprecated(
+        "client.futures.get_funding_settlements() is deprecated, use client.perp.get_funding_settlements() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_funding_settlements(
         self, params: GetFundingSettlementsParams | None = None
     ):
@@ -125,10 +133,6 @@ class FuturesClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
-        warn_deprecated(
-            "client.futures.get_funding_settlements()",
-            "client.perp.get_funding_settlements()",
-        )
         return await self._client.request(
             "GET",
             "/futures/funding-settlements",

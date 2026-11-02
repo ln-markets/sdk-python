@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lnmarkets_sdk.rest.v3.http.client import LNMClient
 
+from typing_extensions import deprecated
+
 from lnmarkets_sdk.rest.v3._internal.models import PaginatedResponse
-from lnmarkets_sdk.rest.v3._internal.utils import warn_deprecated
 from lnmarkets_sdk.rest.v3.models.funding_fees import FundingFees
 from lnmarkets_sdk.rest.v3.models.futures_isolated import (
     AddMarginParams,
@@ -31,6 +32,9 @@ class FuturesIsolatedClient:
     def __init__(self, client: "LNMClient"):
         self._client = client
 
+    @deprecated(
+        "client.futures.isolated.new_trade() is deprecated, use client.perp.isolated.new_trade() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def new_trade(
         self, params: FuturesOrder
     ) -> FuturesRunningTrade | FuturesOpenTrade:
@@ -57,9 +61,6 @@ class FuturesIsolatedClient:
             print(f"Trade ID: {trade.id}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.new_trade()", "client.perp.isolated.new_trade()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trade",
@@ -68,6 +69,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade | FuturesOpenTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.get_running_trades() is deprecated, use client.perp.isolated.get_running_trades() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_running_trades(self):
         """
         Get all running isolated margin trades.
@@ -82,10 +86,6 @@ class FuturesIsolatedClient:
                 print(f"Trade ID: {trade.id}, P&L: {trade.pl}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.get_running_trades()",
-            "client.perp.isolated.get_running_trades()",
-        )
         return await self._client.request(
             "GET",
             "/futures/isolated/trades/running",
@@ -93,6 +93,9 @@ class FuturesIsolatedClient:
             response_model=list[FuturesRunningTrade],
         )
 
+    @deprecated(
+        "client.futures.isolated.get_open_trades() is deprecated, use client.perp.isolated.get_open_trades() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_open_trades(self):
         """
         Get all open isolated margin trades.
@@ -107,10 +110,6 @@ class FuturesIsolatedClient:
                 print(f"Trade ID: {trade.id}, Price: {trade.price}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.get_open_trades()",
-            "client.perp.isolated.get_open_trades()",
-        )
         return await self._client.request(
             "GET",
             "/futures/isolated/trades/open",
@@ -118,6 +117,9 @@ class FuturesIsolatedClient:
             response_model=list[FuturesOpenTrade],
         )
 
+    @deprecated(
+        "client.futures.isolated.get_closed_trades() is deprecated, use client.perp.isolated.get_closed_trades() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_closed_trades(self, params: GetClosedTradesParams | None = None):
         """
         Get closed isolated margin trades history.
@@ -137,10 +139,6 @@ class FuturesIsolatedClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.get_closed_trades()",
-            "client.perp.isolated.get_closed_trades()",
-        )
         return await self._client.request(
             "GET",
             "/futures/isolated/trades/closed",
@@ -149,6 +147,9 @@ class FuturesIsolatedClient:
             response_model=PaginatedResponse[FuturesClosedTrade | FuturesCanceledTrade],
         )
 
+    @deprecated(
+        "client.futures.isolated.close() is deprecated, use client.perp.isolated.close() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def close(self, params: CloseTradeParams):
         """
         Close an isolated margin trade.
@@ -165,9 +166,6 @@ class FuturesIsolatedClient:
             print(f"Closed: {closed.closed}, P&L: {closed.pl}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.close()", "client.perp.isolated.close()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trade/close",
@@ -176,6 +174,9 @@ class FuturesIsolatedClient:
             response_model=FuturesClosedTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.cancel() is deprecated, use client.perp.isolated.cancel() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def cancel(self, params: CancelTradeParams):
         """
         Cancel an isolated margin trade.
@@ -192,9 +193,6 @@ class FuturesIsolatedClient:
             print(f"Canceled: {canceled.canceled}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.cancel()", "client.perp.isolated.cancel()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trade/cancel",
@@ -203,6 +201,9 @@ class FuturesIsolatedClient:
             response_model=FuturesCanceledTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.cancel_all() is deprecated, use client.perp.isolated.cancel_all() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def cancel_all(self):
         """
         Cancel all isolated margin trades.
@@ -216,9 +217,6 @@ class FuturesIsolatedClient:
             print(f"Canceled {len(canceled)} trades")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.cancel_all()", "client.perp.isolated.cancel_all()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trades/cancel-all",
@@ -226,6 +224,9 @@ class FuturesIsolatedClient:
             response_model=list[FuturesCanceledTrade],
         )
 
+    @deprecated(
+        "client.futures.isolated.add_margin() is deprecated, use client.perp.isolated.add_margin() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def add_margin(self, params: AddMarginParams):
         """
         Add margin to an isolated trade.
@@ -242,9 +243,6 @@ class FuturesIsolatedClient:
             print(f"New margin: {updated.margin}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.add_margin()", "client.perp.isolated.add_margin()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trade/add-margin",
@@ -253,6 +251,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.cash_in() is deprecated, use client.perp.isolated.cash_in() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def cash_in(self, params: CashInParams):
         """
         Cash in on an isolated trade.
@@ -269,9 +270,6 @@ class FuturesIsolatedClient:
             print(f"Trade margin: {updated.margin}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.cash_in()", "client.perp.isolated.cash_in()"
-        )
         return await self._client.request(
             "POST",
             "/futures/isolated/trade/cash-in",
@@ -280,6 +278,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.update_stoploss() is deprecated, use client.perp.isolated.update_stoploss() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def update_stoploss(self, params: UpdateStoplossParams):
         """
         Update stop loss for an isolated trade.
@@ -296,10 +297,6 @@ class FuturesIsolatedClient:
             print(f"New stop loss: {updated.stoploss}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.update_stoploss()",
-            "client.perp.isolated.update_stoploss()",
-        )
         return await self._client.request(
             "PUT",
             "/futures/isolated/trade/stoploss",
@@ -308,6 +305,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.update_takeprofit() is deprecated, use client.perp.isolated.update_takeprofit() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def update_takeprofit(self, params: UpdateTakeprofitParams):
         """
         Update take profit for an isolated trade.
@@ -324,10 +324,6 @@ class FuturesIsolatedClient:
             print(f"New take profit: {updated.takeprofit}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.update_takeprofit()",
-            "client.perp.isolated.update_takeprofit()",
-        )
         return await self._client.request(
             "PUT",
             "/futures/isolated/trade/takeprofit",
@@ -336,6 +332,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.remove_stoploss() is deprecated, use client.perp.isolated.remove_stoploss() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def remove_stoploss(
         self, params: RemoveStoplossParams
     ) -> FuturesRunningTrade | FuturesOpenTrade:
@@ -356,10 +355,6 @@ class FuturesIsolatedClient:
             print(f"Stop loss: {updated.stoploss}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.remove_stoploss()",
-            "client.perp.isolated.remove_stoploss()",
-        )
         return await self._client.request(
             "DELETE",
             "/futures/isolated/trade/stoploss",
@@ -368,6 +363,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade | FuturesOpenTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.remove_takeprofit() is deprecated, use client.perp.isolated.remove_takeprofit() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def remove_takeprofit(
         self, params: RemoveTakeprofitParams
     ) -> FuturesRunningTrade | FuturesOpenTrade:
@@ -386,10 +384,6 @@ class FuturesIsolatedClient:
             print(f"Take profit: {updated.takeprofit}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.remove_takeprofit()",
-            "client.perp.isolated.remove_takeprofit()",
-        )
         return await self._client.request(
             "DELETE",
             "/futures/isolated/trade/takeprofit",
@@ -398,6 +392,9 @@ class FuturesIsolatedClient:
             response_model=FuturesRunningTrade | FuturesOpenTrade,
         )
 
+    @deprecated(
+        "client.futures.isolated.get_funding_fees() is deprecated, use client.perp.isolated.get_funding_fees() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_funding_fees(
         self, params: GetIsolatedFundingFeesParams | None = None
     ):
@@ -419,10 +416,6 @@ class FuturesIsolatedClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.get_funding_fees()",
-            "client.perp.isolated.get_funding_fees()",
-        )
         return await self._client.request(
             "GET",
             "/futures/isolated/funding-fees",
@@ -431,6 +424,9 @@ class FuturesIsolatedClient:
             response_model=PaginatedResponse[FundingFees],
         )
 
+    @deprecated(
+        "client.futures.isolated.get_canceled_trades() is deprecated, use client.perp.isolated.get_canceled_trades() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_canceled_trades(self, params: GetClosedTradesParams | None = None):
         """
         Get canceled isolated margin trades history.
@@ -450,10 +446,6 @@ class FuturesIsolatedClient:
                 print(f"Next cursor: {response.next_cursor}")
         ```
         """
-        warn_deprecated(
-            "client.futures.isolated.get_canceled_trades()",
-            "client.perp.isolated.get_canceled_trades()",
-        )
         return await self._client.request(
             "GET",
             "/futures/isolated/trades/canceled",
