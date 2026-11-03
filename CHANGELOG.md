@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-29
+
+Multi-market perp API (`/v3/perp`) and `GET /v3/markets`.
+
+### Added
+
+- `client.get_markets()` (`GET /v3/markets`): the released markets, plus the early-access markets your API key can access. Returns `Market` models (`lnmarkets_sdk.rest.v3.models.markets`).
+- `client.perp` (`PerpClient`) for `/v3/perp`: `get_ticker()`, `get_candles()` and `get_funding_settlements()`.
+- `client.perp.isolated` (`PerpIsolatedClient`) for `/v3/perp/isolated`: `new_trade()`, `get_trade()`, `cancel()`, `cancel_all()`, `close()`, `add_margin()`, `cash_in()`, `update_stoploss()`, `update_takeprofit()`, `remove_stoploss()`, `remove_takeprofit()`, `get_open_trades()`, `get_running_trades()`, `get_closed_trades()`, `get_canceled_trades()` and `get_funding_fees()`.
+- Perp models in `lnmarkets_sdk.rest.v3.models.perp`. Every perp call takes the market key (`instrument` + `pair`). Trades, tickers, funding settlements and funding fees include the quanto fields (`quanto_adjustment_rate`, `quanto_adjustment_fee`, `sum_quanto_adjustment_fees`), the notional fields, and the `mark` price.
+- `client.perp.isolated.get_trade()` (`GET /v3/perp/isolated/trade`): one trade in any state and of any market, by `id` or by `client_id` (`GetPerpTradeParams`). Returns the variant that matches the trade state.
+- `label` on `PerpOrder` and on perp trades: a free tag several trades can share. On `/perp`, `client_id` is a unique client order ID: reusing one fails with HTTP 409 `CONFLICT`, and older trades' tags now show as `label`.
+- Cursor pagination for the perp history reads: pass `next_cursor` back as `cursor`. The cursor is an object (`PerpCursor(value=..., id=...)`), sent as `cursor[value]` and `cursor[id]` in the query.
+- The public perp routes and `get_markets()` sign the request when the client has credentials, so early-access markets work.
+
+### Deprecated
+
+- `client.futures.get_ticker()`, `get_candles()`, `get_funding_settlements()` and every `client.futures.isolated` method. They still work. They are marked with `@deprecated` (PEP 702), so IDEs and type checkers strike the call through and show the `client.perp` method to use, and at runtime they raise a `DeprecationWarning` with the same hint: call it with `instrument="inverse_perp", pair="btc_usd"`. `client.futures.get_leaderboard()` and `client.futures.cross` have no perp replacement yet and are not deprecated.
+
+### Fixed
+
+- Request signature for bodies with nested whole floats (e.g. `{"stoploss": {"value": 64000.0}}`): nested values are now sent as `64000`, like the server's `JSON.stringify`, so the signature matches.
+- `futures.isolated.update_takeprofit()` no longer prints its params.
+
 ## [0.2.0] - 2026-10-26
 
 Models re-synced with the published v3 API reference.

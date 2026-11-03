@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from lnmarkets_sdk.rest.v3.http.client import LNMClient
 
+from typing_extensions import deprecated
+
 from lnmarkets_sdk.rest.v3._internal.models import PaginatedResponse
 from lnmarkets_sdk.rest.v3.models.funding_fees import FundingSettlement
 from lnmarkets_sdk.rest.v3.models.futures_data import (
@@ -25,9 +27,14 @@ class FuturesClient:
         self.isolated = FuturesIsolatedClient(client)
         self.cross = FuturesCrossClient(client)
 
+    @deprecated(
+        "client.futures.get_ticker() is deprecated, use client.perp.get_ticker() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_ticker(self):
         """
         Get current futures ticker data.
+
+        Deprecated: use `client.perp.get_ticker()` with the BTC/USD market key.
 
         Example:
         ```python
@@ -67,9 +74,14 @@ class FuturesClient:
             response_model=Leaderboard,
         )
 
+    @deprecated(
+        "client.futures.get_candles() is deprecated, use client.perp.get_candles() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_candles(self, params: GetCandlesParams):
         """
         Get OHLC candle data.
+
+        Deprecated: use `client.perp.get_candles()` with the BTC/USD market key.
 
         Example:
         ```python
@@ -97,11 +109,16 @@ class FuturesClient:
             response_model=PaginatedResponse[Candle],
         )
 
+    @deprecated(
+        "client.futures.get_funding_settlements() is deprecated, use client.perp.get_funding_settlements() with instrument='inverse_perp', pair='btc_usd' instead."
+    )
     async def get_funding_settlements(
         self, params: GetFundingSettlementsParams | None = None
     ):
         """
         Get funding settlement history.
+
+        Deprecated: use `client.perp.get_funding_settlements()` with the BTC/USD market key.
 
         Example:
         ```python

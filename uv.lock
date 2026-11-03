@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 
 [[package]]
@@ -196,7 +196,7 @@ wheels = [
 
 [[package]]
 name = "lnmarkets-sdk"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -205,6 +205,7 @@ dependencies = [
     { name = "pygments" },
     { name = "requests" },
     { name = "tenacity" },
+    { name = "typing-extensions" },
     { name = "websockets" },
 ]
 
@@ -237,6 +238,7 @@ requires-dist = [
     { name = "pygments", specifier = ">=2.20.0" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "tenacity", specifier = ">=9.1.4" },
+    { name = "typing-extensions", specifier = ">=4.12" },
     { name = "websockets", specifier = ">=12.0" },
 ]
 
